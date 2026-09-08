@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L'Atelier de la copie — TCF Canada · Expression écrite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,700;1,400;1,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bureau:#161E28;
+  --bureau-2:#1E2833;
+  --papier:#FCFBF7;
+  --papier-2:#F2EEE3;
+  --encre:#1A2330;
+  --encre-2:#4C5A6E;
+  --encre-3:#8492A4;
+  --seyes:#C6D5E7;
+  --seyes-fort:#9FB8D4;
+  --marge:#DFA0AE;
+  --rouge:#BE2F46;
+  --rouge-fond:rgba(190,47,70,.13);
+  --ambre:#B57C10;
+  --ambre-fond:rgba(181,124,16,.15);
+  --bleu:#28569E;
+  --bleu-fond:rgba(40,86,158,.12);
+  --vert:#256F51;
+  --vert-fond:rgba(37,111,81,.14);
+  --ligne:32px;
+  --serif:'Spectral',Georgia,serif;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bureau);
+  background-image:radial-gradient(ellipse at 15% -10%,#25323F 0%,transparent 55%),
+                   radial-gradient(ellipse at 100% 100%,#1B2A2B 0%,transparent 45%);
+  color:var(--papier);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit}
+
+/* ---------- en-tête ---------- */
+.bandeau{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+  padding:22px 26px 0;max-width:1560px;margin:0 auto;flex-wrap:wrap;
+}
+.marque{display:flex;align-items:baseline;gap:14px}
+.marque h1{
+  font-family:var(--serif);font-weight:700;font-size:26px;letter-spacing:-.01em;
+  margin:0;color:var(--papier);
+}
+.marque h1 em{font-style:italic;font-weight:600;color:var(--marge)}
+.marque .sous{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--encre-3);
+}
+.onglets{display:flex;gap:2px;background:rgba(255,255,255,.05);padding:4px;border-radius:10px}
+.onglets button{
+  border:0;background:transparent;color:var(--encre-3);
+  padding:9px 18px;border-radius:7px;font-size:13.5px;font-weight:500;letter-spacing:.01em;
+  transition:background .18s,color .18s;
+}
+.onglets button:hover{color:var(--papier-2)}
+.onglets button[aria-selected="true"]{background:var(--papier);color:var(--encre);font-weight:600}
+.onglets button:focus-visible{outline:2px solid var(--marge);outline-offset:2px}
+
+.vue{display:none;max-width:1560px;margin:0 auto;padding:18px 26px 60px}
+.vue.actif{display:block}
+
+/* ---------- grille éditeur ---------- */
+.grille{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+@media(max-width:1150px){.grille{grid-template-columns:minmax(0,1fr)}}
+
+.carte{background:var(--papier);color:var(--encre);border-radius:12px;overflow:hidden;
+  box-shadow:0 18px 44px rgba(0,0,0,.34),0 2px 0 rgba(255,255,255,.06) inset}
+.carte.sombre{background:var(--bureau-2);color:var(--papier);border:1px solid rgba(255,255,255,.08);box-shadow:none}
+
+.entete-carte{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 16px;border-bottom:1px solid rgba(26,35,48,.12);background:var(--papier-2);
+}
+.entete-carte h2{
+  margin:0;font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--encre-2);font-weight:600;
+}
+.carte.sombre .entete-carte{background:rgba(255,255,255,.04);border-bottom-color:rgba(255,255,255,.08)}
+.carte.sombre .entete-carte h2{color:var(--encre-3)}
+
+/* ---------- sélecteur de tâche ---------- */
+.taches{display:flex;gap:8px;padding:14px 16px;flex-wrap:wrap;border-bottom:1px solid rgba(26,35,48,.1)}
+.tache{
+  flex:1 1 150px;text-align:left;border:1px solid rgba(26,35,48,.16);background:transparent;
+  border-radius:9px;padding:9px 12px;color:var(--encre-2);transition:all .18s;
+}
+.tache b{display:block;font-family:var(--serif);font-size:15px;font-weight:600;color:var(--encre)}
+.tache span{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--encre-3)}
+.tache:hover{border-color:var(--marge)}
+.tache[aria-pressed="true"]{background:var(--encre);border-color:var(--encre)}
+.tache[aria-pressed="true"] b,.tache[aria-pressed="true"] span{color:var(--papier)}
+.tache[aria-pressed="true"] span{color:var(--marge)}
+
+.consigne-zone{padding:14px 16px;border-bottom:1px solid rgba(26,35,48,.1)}
+.consigne-zone label{
+  display:block;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--encre-3);margin-bottom:7px;
+}
+#consigne{
+  width:100%;min-height:72px;resize:vertical;border:1px solid rgba(26,35,48,.18);border-radius:8px;
+  padding:10px 12px;font-family:var(--serif);font-size:15px;line-height:1.5;color:var(--encre);
+  background:#fff;
+}
+#consigne:focus{outline:none;border-color:var(--marge);box-shadow:0 0 0 3px rgba(223,160,174,.25)}
+
+/* ---------- feuille Seyès (élément signature) ---------- */
+.copie{display:flex;background:var(--papier)}
+.gouttiere{
+  width:78px;flex:0 0 78px;position:relative;
+  border-right:2px solid var(--marge);
+  background:linear-gradient(90deg,transparent 0 62px,rgba(223,160,174,.07) 62px 100%);
+}
+.gouttiere .annot{
+  position:absolute;right:9px;font-family:var(--mono);font-size:10px;font-weight:600;
+  letter-spacing:.08em;line-height:1;padding:3px 5px;border-radius:4px;white-space:nowrap;
+  cursor:default;
+}
+.annot.e-haute{color:var(--rouge);background:var(--rouge-fond)}
+.annot.e-moyenne{color:var(--ambre);background:var(--ambre-fond)}
+.annot.e-basse{color:var(--bleu);background:var(--bleu-fond)}
+
+.feuille{position:relative;flex:1;min-width:0;
+  background-image:repeating-linear-gradient(to bottom,transparent 0 calc(var(--ligne) - 1px),var(--seyes) calc(var(--ligne) - 1px) var(--ligne));
+  background-position:0 22px;}
+.calque,#redaction{
+  font-family:var(--serif);font-size:17px;line-height:var(--ligne);
+  padding:22px 22px 40px;margin:0;border:0;width:100%;
+  white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;letter-spacing:0;
+}
+.calque{position:absolute;inset:0;color:transparent;pointer-events:none;user-select:none}
+#redaction{
+  position:relative;background:transparent;color:var(--encre);resize:none;display:block;
+  min-height:340px;overflow:hidden;caret-color:var(--rouge);
+}
+#redaction:focus{outline:none}
+#redaction::placeholder{color:#B4BECB;font-style:italic}
+.calque mark{background:transparent;color:transparent;text-decoration-line:underline;
+  text-decoration-style:wavy;text-decoration-thickness:1.6px;text-underline-offset:4px}
+.calque mark.e-haute{text-decoration-color:var(--rouge);background:var(--rouge-fond)}
+.calque mark.e-moyenne{text-decoration-color:var(--ambre);background:var(--ambre-fond)}
+.calque mark.e-basse{text-decoration-color:var(--bleu);background:var(--bleu-fond)}
+
+/* ---------- barre d'outils ---------- */
+.outils{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:12px 16px;background:var(--papier-2);border-top:1px solid rgba(26,35,48,.12)}
+.jauge{display:flex;align-items:center;gap:10px;margin-right:auto}
+.jauge .nb{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--encre);line-height:1}
+.jauge .det{font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--encre-3);text-transform:uppercase}
+.barre-mots{width:150px;height:6px;border-radius:3px;background:rgba(26,35,48,.12);position:relative;overflow:hidden}
+.barre-mots i{position:absolute;inset:0 auto 0 0;background:var(--ambre);transition:width .25s,background .25s}
+.barre-mots.ok i{background:var(--vert)}
+.barre-mots.trop i{background:var(--rouge)}
+.bouton{
+  border:1px solid rgba(26,35,48,.2);background:transparent;color:var(--encre-2);
+  padding:9px 14px;border-radius:8px;font-size:13px;font-weight:500;transition:all .16s;
+}
+.bouton:hover{border-color:var(--encre);color:var(--encre)}
+.bouton.principal{background:var(--rouge);border-color:var(--rouge);color:#fff;font-weight:600;
+  box-shadow:0 3px 0 #8E1F32}
+.bouton.principal:hover{background:#A82740;border-color:#A82740}
+.bouton.principal:active{transform:translateY(2px);box-shadow:0 1px 0 #8E1F32}
+.bouton[disabled]{opacity:.5;cursor:not-allowed}
+.bouton:focus-visible{outline:2px solid var(--bleu);outline-offset:2px}
+.chrono{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--encre-2);
+  border:1px solid rgba(26,35,48,.2);border-radius:8px;padding:8px 11px;min-width:78px;text-align:center}
+.chrono.alerte{color:var(--rouge);border-color:var(--rouge)}
+
+/* ---------- panneau marge (droite) ---------- */
+.pile{display:flex;flex-direction:column;gap:16px}
+.section-live{border-bottom:1px solid rgba(255,255,255,.07)}
+.section-live:last-child{border-bottom:0}
+.section-live > .titre{
+  display:flex;align-items:center;gap:9px;padding:11px 16px;font-size:13px;font-weight:600;
+}
+.section-live .pastille{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;
+  font-family:var(--mono);font-size:11px;font-weight:600}
+.p-ok{background:var(--vert-fond);color:#6FD3A9}
+.p-ko{background:var(--rouge-fond);color:#F08599}
+.p-am{background:var(--ambre-fond);color:#E5B549}
+.liste-live{list-style:none;margin:0;padding:0 16px 12px}
+.liste-live li{
+  font-size:12.5px;line-height:1.5;color:#C3CDDA;padding:7px 0;border-top:1px solid rgba(255,255,255,.06);
+  display:flex;gap:8px;align-items:flex-start;
+}
+.liste-live li:first-child{border-top:0}
+.liste-live code{font-family:var(--mono);font-size:11.5px;background:rgba(255,255,255,.07);
+  padding:1px 5px;border-radius:4px;color:#fff}
+.liste-live .fleche{color:var(--marge);font-weight:600}
+.liste-live .vide{color:var(--encre-3);font-style:italic;border:0}
+
+/* ---------- résultat ---------- */
+#resultat{display:none}
+#resultat.visible{display:block}
+.note-bloc{display:flex;align-items:stretch;gap:0;border-bottom:1px solid rgba(26,35,48,.12)}
+.note-grande{padding:20px 22px;text-align:center;border-right:1px solid rgba(26,35,48,.12);min-width:140px}
+.note-grande .val{font-family:var(--serif);font-size:52px;font-weight:700;line-height:.95;color:var(--encre)}
+.note-grande .val small{font-size:20px;font-weight:400;color:var(--encre-3)}
+.note-grande .lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--encre-3);margin-top:6px}
+.badges{display:flex;flex-wrap:wrap;gap:10px;align-content:center;padding:20px 22px}
+.badge{border:1px solid rgba(26,35,48,.18);border-radius:9px;padding:8px 14px}
+.badge .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--encre-3)}
+.badge .v{font-family:var(--serif);font-size:21px;font-weight:700;color:var(--encre);line-height:1.1}
+.badge.cible-atteinte{border-color:var(--vert);background:var(--vert-fond)}
+.badge.cible-atteinte .v{color:var(--vert)}
+.badge.cible-manquee{border-color:var(--rouge);background:var(--rouge-fond)}
+.badge.cible-manquee .v{color:var(--rouge)}
+
+.criteres{padding:16px 22px;border-bottom:1px solid rgba(26,35,48,.12)}
+.critere{margin-bottom:13px}
+.critere:last-child{margin-bottom:0}
+.critere .ligne1{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.critere .nom{font-weight:600;font-size:13.5px}
+.critere .sc{font-family:var(--mono);font-size:12px;color:var(--encre-2)}
+.critere .rail{height:7px;border-radius:4px;background:rgba(26,35,48,.1);margin:6px 0 5px;overflow:hidden}
+.critere .rail i{display:block;height:100%;background:var(--encre);border-radius:4px}
+.critere .rail i.faible{background:var(--rouge)}
+.critere .rail i.moyen{background:var(--ambre)}
+.critere .rail i.bon{background:var(--vert)}
+.critere p{margin:0;font-size:12.5px;color:var(--encre-2);line-height:1.5}
+
+.bloc{padding:16px 22px;border-bottom:1px solid rgba(26,35,48,.12)}
+.bloc:last-child{border-bottom:0}
+.bloc h3{margin:0 0 11px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--encre-3);font-weight:600}
+.err{border-left:3px solid var(--rouge);padding:8px 0 8px 12px;margin-bottom:11px}
+.err.g-moyenne{border-left-color:var(--ambre)}
+.err.g-basse{border-left-color:var(--bleu)}
+.err .tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--rouge);font-weight:600}
+.err.g-moyenne .tag{color:var(--ambre)}
+.err.g-basse .tag{color:var(--bleu)}
+.err .paire{font-family:var(--serif);font-size:15px;margin:3px 0 4px}
+.err .paire s{color:var(--encre-3);text-decoration-color:var(--rouge)}
+.err .paire b{color:var(--vert)}
+.err .exp{font-size:12.5px;color:var(--encre-2);margin:0}
+.puces{margin:0;padding-left:18px;font-size:13.5px}
+.puces li{margin-bottom:6px}
+.modele{font-family:var(--serif);font-size:16px;line-height:1.75;white-space:pre-wrap;
+  background:var(--papier-2);border-radius:9px;padding:16px 18px}
+.tirettes{display:flex;flex-wrap:wrap;gap:7px}
+.tirette{font-family:var(--serif);font-size:14px;background:var(--papier-2);border:1px solid rgba(26,35,48,.12);
+  border-radius:20px;padding:5px 13px;cursor:pointer;transition:all .15s}
+.tirette:hover{border-color:var(--marge);background:#fff}
+
+.charge{display:flex;align-items:center;gap:12px;padding:26px 22px;color:var(--encre-2);font-size:13.5px}
+.spin{width:17px;height:17px;border:2px solid rgba(26,35,48,.18);border-top-color:var(--rouge);
+  border-radius:50%;animation:tour .7s linear infinite;flex:0 0 auto}
+@keyframes tour{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation-duration:2s}*{transition-duration:.01ms!important}}
+
+/* ---------- conjugaisons ---------- */
+.grille-conj{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:980px){.grille-conj{grid-template-columns:minmax(0,1fr)}}
+.recherche{padding:12px 14px}
+.recherche input{width:100%;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);
+  border-radius:8px;padding:9px 11px;color:var(--papier);font-size:13.5px}
+.recherche input:focus{outline:none;border-color:var(--marge)}
+.recherche input::placeholder{color:var(--encre-3)}
+.filtres{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 12px}
+.filtre{border:1px solid rgba(255,255,255,.14);background:transparent;color:var(--encre-3);
+  border-radius:20px;padding:4px 11px;font-size:11.5px}
+.filtre[aria-pressed="true"]{background:var(--marge);border-color:var(--marge);color:var(--encre);font-weight:600}
+.liste-verbes{max-height:560px;overflow-y:auto;padding:0 8px 10px}
+.verbe-item{width:100%;text-align:left;border:0;background:transparent;color:#C3CDDA;
+  padding:8px 10px;border-radius:7px;display:flex;justify-content:space-between;gap:8px;align-items:baseline;font-size:14px}
+.verbe-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.verbe-item[aria-current="true"]{background:var(--papier);color:var(--encre);font-weight:600}
+.verbe-item .gl{font-size:11.5px;color:var(--encre-3);font-family:var(--mono)}
+.verbe-item[aria-current="true"] .gl{color:var(--encre-2)}
+
+.fiche-verbe{padding:18px 22px;border-bottom:1px solid rgba(26,35,48,.12)}
+.fiche-verbe h3{margin:0;font-family:var(--serif);font-size:32px;font-weight:700;letter-spacing:-.01em}
+.fiche-verbe .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.puce{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid rgba(26,35,48,.18);border-radius:5px;padding:3px 8px;color:var(--encre-2)}
+.puce.acc{border-color:var(--rouge);color:var(--rouge)}
+.puce.es{border-color:var(--bleu);color:var(--bleu);text-transform:none;letter-spacing:0;font-family:var(--serif);font-size:13px}
+.tableau-temps{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:14px;padding:18px 22px}
+.temps{border:1px solid rgba(26,35,48,.13);border-radius:9px;overflow:hidden}
+.temps h4{margin:0;padding:7px 11px;background:var(--papier-2);font-family:var(--mono);font-size:10px;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--encre-2);font-weight:600;
+  display:flex;justify-content:space-between;align-items:center}
+.temps h4 em{font-style:normal;font-family:var(--serif);font-size:11px;letter-spacing:0;
+  text-transform:none;color:var(--rouge)}
+.temps table{width:100%;border-collapse:collapse;font-size:14px}
+.temps td{padding:3px 11px}
+.temps td.p{color:var(--encre-3);font-size:12px;width:64px;font-family:var(--mono)}
+.temps td.f{font-family:var(--serif)}
+.temps tr:nth-child(even){background:rgba(26,35,48,.035)}
+.note-tcf{margin:0;padding:0 22px 18px;font-size:12.5px;color:var(--encre-2)}
+.note-tcf b{color:var(--rouge)}
+
+/* ---------- exercices ---------- */
+.exo-tetes{display:flex;gap:6px;padding:12px 16px 0;flex-wrap:wrap}
+.exo-tete{border:1px solid rgba(255,255,255,.14);background:transparent;color:var(--encre-3);
+  border-radius:7px;padding:6px 12px;font-size:12.5px}
+.exo-tete[aria-pressed="true"]{background:rgba(255,255,255,.1);color:#fff;border-color:transparent}
+.exo-corps{padding:16px}
+.question{font-family:var(--serif);font-size:19px;line-height:1.65;margin:0 0 4px}
+.question .trou{border-bottom:2px dotted var(--marge);padding:0 26px;display:inline-block}
+.question .inf{color:var(--marge);font-style:italic}
+.consigne-exo{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--encre-3);margin:0 0 14px}
+.rangee-reponse{display:flex;gap:9px;flex-wrap:wrap}
+#reponse-exo{flex:1 1 220px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.05);
+  border-radius:8px;padding:11px 13px;color:#fff;font-family:var(--serif);font-size:17px}
+#reponse-exo:focus{outline:none;border-color:var(--marge)}
+.bouton.clair{border-color:rgba(255,255,255,.2);color:#D8E0EA}
+.bouton.clair:hover{border-color:#fff;color:#fff}
+.verdict{margin-top:14px;border-radius:9px;padding:12px 14px;font-size:13.5px;display:none}
+.verdict.visible{display:block}
+.verdict.juste{background:var(--vert-fond);border:1px solid rgba(37,111,81,.4);color:#84DCB6}
+.verdict.faux{background:var(--rouge-fond);border:1px solid rgba(190,47,70,.4);color:#F2A0AF}
+.verdict.presque{background:var(--ambre-fond);border:1px solid rgba(181,124,16,.45);color:#EFC97E}
+.verdict b{font-family:var(--serif);font-size:17px}
+.verdict .astuce{display:block;margin-top:6px;color:#AFBCCB;font-size:12.5px}
+.stats{display:flex;gap:16px;flex-wrap:wrap;padding:0 16px 16px}
+.stat{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--encre-3)}
+.stat b{display:block;font-family:var(--serif);font-size:22px;letter-spacing:0;text-transform:none;color:#fff}
+.avert{background:var(--ambre-fond);border:1px solid rgba(181,124,16,.35);border-radius:9px;
+  padding:11px 13px;margin:0 16px 16px;font-size:12.5px;color:#E5C57E}
+</style>
+</head>
+<body>
+
+<header class="bandeau">
+  <div class="marque">
+    <h1>L'Atelier de la <em>copie</em></h1>
+    <span class="sous">TCF Canada · Expression écrite · Cible NCLC 7</span>
+  </div>
+  <nav class="onglets" role="tablist">
+    <button role="tab" aria-selected="true" data-vue="editeur">Éditeur &amp; correction</button>
+    <button role="tab" aria-selected="false" data-vue="conjugaison">Conjugaisons</button>
+  </nav>
+</header>
+
+<!-- ====================== VUE ÉDITEUR ====================== -->
+<main class="vue actif" id="vue-editeur">
+<div class="grille">
+
+  <div class="pile">
+    <section class="carte">
+      <div class="entete-carte"><h2>La consigne</h2><span class="sous" id="rappel-mots" style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--encre-3)"></span></div>
+      <div class="taches" id="taches"></div>
+      <div class="consigne-zone">
+        <label for="consigne">Collez ici l'énoncé du sujet</label>
+        <textarea id="consigne" placeholder="Ex. : Vous venez de déménager à Montréal. Vous écrivez à votre ancien voisin pour lui donner de vos nouvelles…"></textarea>
+      </div>
+
+      <div class="copie">
+        <div class="gouttiere" id="gouttiere"></div>
+        <div class="feuille">
+          <div class="calque" id="calque" aria-hidden="true"></div>
+          <textarea id="redaction" spellcheck="false" placeholder="Rédigez votre copie ici. Les traits rouges apparaissent au fil de l'écriture."></textarea>
+        </div>
+      </div>
+
+      <div class="outils">
+        <div class="jauge">
+          <div>
+            <div class="nb"><span id="nb-mots">0</span></div>
+            <div class="det" id="cible-mots">mots</div>
+          </div>
+          <div class="barre-mots" id="barre-mots"><i style="width:0"></i></div>
+        </div>
+        <button class="bouton" id="btn-chrono">Démarrer le chrono</button>
+        <span class="chrono" id="chrono">00:00</span>
+        <button class="bouton" id="btn-vider">Vider</button>
+        <button class="bouton principal" id="btn-corriger">Corriger ma copie</button>
+      </div>
+    </section>
+
+    <section class="carte" id="resultat"></section>
+  </div>
+
+  <aside class="pile">
+    <section class="carte sombre">
+      <div class="entete-carte"><h2>Marge du correcteur · en direct</h2><span id="total-live" style="font-family:var(--mono);font-size:11px;color:var(--marge)"></span></div>
+      <div id="live"></div>
+    </section>
+    <section class="carte sombre">
+      <div class="entete-carte"><h2>Codes de correction</h2></div>
+      <ul class="liste-live" style="padding-bottom:14px">
+        <li><code>REG</code> registre tu / vous incohérent</li>
+        <li><code>ORT</code> orthographe, accent, élision</li>
+        <li><code>GR</code> grammaire, accord, article</li>
+        <li><code>CONJ</code> conjugaison, mode, temps</li>
+        <li><code>ESP</code> calque de l'espagnol</li>
+        <li><code>LEX</code> lexique trop pauvre ou impropre</li>
+        <li><code>COH</code> cohérence, connecteurs, plan</li>
+      </ul>
+    </section>
+  </aside>
+
+</div>
+</main>
+
+<!-- ====================== VUE CONJUGAISON ====================== -->
+<main class="vue" id="vue-conjugaison">
+<div class="grille-conj">
+
+  <div class="pile">
+    <section class="carte sombre">
+      <div class="entete-carte"><h2>Verbes du TCF</h2><span id="cpt-verbes" style="font-family:var(--mono);font-size:11px;color:var(--encre-3)"></span></div>
+      <div class="recherche"><input id="rech-verbe" type="search" placeholder="Chercher un verbe ou un mot espagnol…"></div>
+      <div class="filtres" id="filtres-verbes"></div>
+      <div class="liste-verbes" id="liste-verbes"></div>
+    </section>
+  </div>
+
+  <div class="pile">
+    <section class="carte" id="fiche"></section>
+
+    <section class="carte sombre">
+      <div class="entete-carte"><h2>Entraînement auto-corrigé</h2><span id="serie" style="font-family:var(--mono);font-size:11px;color:var(--marge)"></span></div>
+      <div class="exo-tetes" id="exo-tetes">
+        <button class="exo-tete" aria-pressed="true" data-mode="flash">Conjugaison éclair</button>
+        <button class="exo-tete" aria-pressed="false" data-mode="phrases">Phrases TCF (B2)</button>
+        <button class="exo-tete" aria-pressed="false" data-mode="cible">Verbe affiché seulement</button>
+      </div>
+      <div class="exo-corps" id="exo-corps"></div>
+      <div class="stats" id="stats-exo"></div>
+    </section>
+  </div>
+
+</div>
+</main>
+
+<script>
+/* ============================================================
+   L'Atelier de la copie — moteur
+   ============================================================ */
+/* ---------- onglets ---------- */
+document.querySelectorAll('.onglets button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.onglets button').forEach(x=>x.setAttribute('aria-selected','false'));
+    b.setAttribute('aria-selected','true');
+    document.querySelectorAll('.vue').forEach(v=>v.classList.remove('actif'));
+    document.getElementById('vue-'+b.dataset.vue).classList.add('actif');
+  });
+});
+
+/* ============================================================
+   1. TÂCHES — bornes officielles TCF Canada
+   ============================================================ */
+const TACHES = {
+  1:{titre:'Tâche 1',type:'Message, courriel ou annonce',min:60,max:120,cible:[95,115],minutes:15,
+     attendu:"Message adressé à un ou plusieurs destinataires dont le statut est précisé dans la consigne : décrire, raconter et/ou expliquer.",
+     plan:[
+      ['Objet',"Une ligne courte qui annonce le contenu : « Objet : mes vacances à Londres »."],
+      ['Salutations',"« Salut Ayoub, comment vas-tu ? » entre amis ; « Bonjour Madame Tremblay, » en contexte formel."],
+      ['But du message',"« Je t'écris pour te dire que… » / « Je vous écris afin de vous informer que… »"],
+      ['Circonstances',"Qui ? quoi ? quand ? où ? avec qui ? Deux ou trois détails concrets, pas plus."],
+      ['Attente concrète',"Ce que vous demandez au destinataire : « J'aimerais que tu me recommandes quelques endroits. »"],
+      ['Recommandation, promesse ou remerciement',"« Je te promets de… », « Je vous remercie par avance de… »"],
+      ['Formule de clôture',"À bientôt, porte-toi bien, amicalement, cordialement — puis votre prénom."]
+     ],
+     formules:["Objet : ","Salut ","Bonjour Madame, ","Je t'écris pour te dire que ",
+      "Je vous écris afin de vous informer que ","Il s'agit de ","J'aimerais que tu me recommandes ",
+      "Pourriez-vous m'indiquer ","Je te remercie par avance de ","Dans l'attente de ta réponse, ",
+      "À bientôt, ","Porte-toi bien, ","Amicalement, ","Cordialement, "]},
+
+  2:{titre:'Tâche 2',type:'Article de blog ou de forum',min:120,max:150,cible:[132,148],minutes:20,
+     attendu:"Compte rendu d'expérience ou récit destiné à plusieurs lecteurs, accompagné de commentaires, d'opinions ou d'arguments, en fonction d'un objectif.",
+     plan:[
+      ['Titre accrocheur',"Court et intrigant : « Un métier de nobles », « Trois raisons de s'y mettre »."],
+      ['Présentation succincte',"Un paragraphe bref qui présente l'activité et donne envie de lire la suite."],
+      ['Votre expérience',"Racontez la vôtre avec des connecteurs chronologiques : d'abord, ensuite, puis, enfin."],
+      ['Recommandations',"Invitez vos lecteurs à s'y intéresser : « je vous recommande vivement de… »"]
+     ],
+     formules:["De nos jours, ","Passionné(e) depuis ","D'abord, ","Ensuite, ","Puis, ","Enfin, ",
+      "Ce qui m'a le plus marqué, c'est ","Au fil du temps, j'ai compris que ",
+      "Je vous recommande vivement de ","N'hésitez pas à ","Si vous hésitez encore, sachez que "]},
+
+  3:{titre:'Tâche 3',type:'Article comparant deux points de vue',min:120,max:180,cible:[150,175],minutes:25,
+     attendu:"Article de journal ou de site Internet qui compare les deux points de vue exprimés dans les deux documents, puis prise de position personnelle sur le thème.",
+     parties:[{nom:'Les deux points de vue',min:40,max:60},{nom:'Votre point de vue',min:80,max:120}],
+     plan:[
+      ['Titre',"Une formule courte qui annonce le débat."],
+      ['Les deux points de vue — 40 à 60 mots',"« De nos jours, la question de… divise l'opinion publique. Certains pensent que… Par contre, d'autres trouvent que… »"],
+      ['Votre point de vue — 80 à 120 mots',"« À ce sujet, il est important de reconnaître que… voilà pourquoi il est nécessaire de… »"]
+     ],
+     formules:["De nos jours, la question de ","divise l'opinion publique. ","Certains estiment que ",
+      "Le premier document soutient que ","Par contre, d'autres trouvent que ","À l'inverse, le second document rappelle que ",
+      "À ce sujet, il est important de reconnaître que ","Pour ma part, je considère que ",
+      "Voilà pourquoi il est nécessaire de ","En définitive, il me semble que "]}
+};
+
+/* --- repères de structure détectés dans la copie --- */
+const OPINION_RE = /(à ce sujet|selon moi|à mon avis|pour ma part|quant à moi|je considère|il me semble|personnellement|j'estime)/i;
+
+function motsDe(t){ return (String(t).trim().match(/[\wÀ-ÿ'’-]+/g)||[]).length; }
+
+function couperT3(txt){
+  const lignes = txt.trim().split(/\n/);
+  let corps = txt.trim(), titre = '';
+  if(lignes.length>1 && motsDe(lignes[0])<=10 && !/[.!?]$/.test(lignes[0].trim())){
+    titre = lignes[0]; corps = lignes.slice(1).join('\n').trim();
+  }
+  const m = corps.match(OPINION_RE);
+  if(m && m.index>20) return {titre:titre, a:corps.slice(0,m.index), b:corps.slice(m.index)};
+  const par = corps.split(/\n\s*\n/);
+  if(par.length>1) return {titre:titre, a:par[0], b:par.slice(1).join('\n')};
+  return {titre:titre, a:corps, b:''};
+}
+
+function structure(txt, n){
+  const tete = txt.slice(0,120);
+  const l0 = txt.trim().split(/\n/)[0] || '';
+  const titreOk = motsDe(l0)>0 && motsDe(l0)<=10 && !/[.!?]$/.test(l0.trim());
+  const par = txt.trim() ? txt.trim().split(/\n\s*\n/).length : 0;
+  const chrono = ["d'abord","tout d'abord","ensuite","puis","enfin","par la suite","au début","finalement","peu à peu"]
+    .filter(c=>new RegExp("\\b"+c.replace(/'/g,"['’]")+"\\b","i").test(txt)).length;
+
+  if(n===1) return [
+    ['Objet', /^\s*objet\s*:/im.test(txt), "Une ligne courte en tête : « Objet : mes vacances à Londres »."],
+    ['Salutations', /\b(salut|bonjour|bonsoir|cher|chère|chers|madame|monsieur)\b/i.test(tete), "« Salut Ayoub, comment vas-tu ? » entre amis ; « Bonjour Madame, » en formel."],
+    ['But du message', /(je t['’]écris|je vous écris|je me permets de vous écrire|je vous adresse)/i.test(txt), "« Je t'écris pour te dire que… » / « Je vous écris afin de vous informer que… »"],
+    ['Circonstances', motsDe(txt)>=45, "Qui ? quoi ? quand ? où ? avec qui ? Deux ou trois détails concrets."],
+    ['Attente concrète', /(j['’]aimerais|je souhaiterais|pourrais-tu|pourriez-vous|je te demande|je vous demande|serait-il possible|peux-tu|pouvez-vous)/i.test(txt), "Ce que vous attendez du destinataire : « J'aimerais que tu me recommandes… »"],
+    ['Remerciement ou promesse', /(je te remercie|je vous remercie|merci d['’]avance|par avance|je te promets|je vous promets|je te recommande|je vous recommande)/i.test(txt), "« Je te remercie par avance de… », « Je te promets de… »"],
+    ['Formule de clôture', /(à bientôt|porte-toi bien|amicalement|cordialement|bien à toi|bien à vous|salutations|au plaisir|à très vite|je t['’]embrasse)/i.test(txt), "À bientôt, porte-toi bien, amicalement, cordialement — puis votre prénom."]
+  ];
+  if(n===2) return [
+    ['Titre accrocheur', titreOk, "Court, sans point final : « Un métier de nobles »."],
+    ['Présentation de l\'activité', par>=2, "Un premier paragraphe bref qui présente le sujet et donne envie de lire."],
+    ['Récit de votre expérience', chrono>=2, "Racontez la vôtre, pas une théorie générale."],
+    ['Connecteurs chronologiques', chrono>=3, "D'abord, ensuite, puis, enfin, par la suite."],
+    ['Recommandation aux lecteurs', /(je vous recommande|je vous conseille|n['’]hésitez pas|je vous invite|lancez-vous|essayez|croyez-moi)/i.test(txt), "« Je vous recommande vivement de… », « N'hésitez pas à… »"]
+  ];
+  const c = couperT3(txt);
+  return [
+    ['Titre', titreOk, "Une formule courte qui annonce le débat."],
+    ['Résumé du premier document', /(certains|les uns|le premier document|selon le premier|d['’]aucuns|une partie de l['’]opinion)/i.test(txt), "« Certains pensent que… »"],
+    ['Résumé du second document', /(d['’]autres|par contre|en revanche|à l['’]inverse|le second document|le deuxième document|au contraire)/i.test(txt), "« Par contre, d'autres trouvent que… »"],
+    ['Prise de position personnelle', OPINION_RE.test(txt), "« À ce sujet, il est important de reconnaître que… »"],
+    ['Deux parties distinctes', motsDe(c.a)>=30 && motsDe(c.b)>=50, "40 à 60 mots pour les deux documents, 80 à 120 mots pour votre avis."]
+  ];
+}
+
+let tacheActive = 1;
+
+/* ============================================================
+   2. MOTEUR TEMPS RÉEL
+   ============================================================ */
+const ACCENTS = {
+  "espere":"espère","esperons":"espérons","preference":"préférence","prefere":"préfère","probleme":"problème",
+  "problemes":"problèmes","tres":"très","apres":"après","deja":"déjà","etre":"être","meme":"même","memes":"mêmes",
+  "pere":"père","mere":"mère","annee":"année","annees":"années","ete":"été","necessaire":"nécessaire",
+  "different":"différent","differente":"différente","differents":"différents","interessant":"intéressant",
+  "interessante":"intéressante","experience":"expérience","premiere":"première","societe":"société",
+  "qualite":"qualité","qualites":"qualités","activite":"activité","activites":"activités","possibilite":"possibilité",
+  "regle":"règle","regles":"règles","eleve":"élève","eleves":"élèves","etudiant":"étudiant","etudiants":"étudiants",
+  "etude":"étude","etudes":"études","ecole":"école","economie":"économie","energie":"énergie","enorme":"énorme",
+  "evidemment":"évidemment","evolution":"évolution","emission":"émission","electrique":"électrique",
+  "developpement":"développement","developper":"développer","gouvernement":"gouvernement","generalement":"généralement",
+  "general":"général","generale":"générale","securite":"sécurité","realite":"réalité","realiser":"réaliser",
+  "resultat":"résultat","resultats":"résultats","reussir":"réussir","reussite":"réussite","reduire":"réduire",
+  "reflechir":"réfléchir","repondre":"répondre","reponse":"réponse","reunion":"réunion",
+  "cout":"coût","gout":"goût","du":"dû","sur":"sûr","theme":"thème","systeme":"système","modele":"modèle",
+  "college":"collège","siecle":"siècle","celebre":"célèbre","complete":"complète","concrete":"concrète",
+  "derniere":"dernière","entiere":"entière","maniere":"manière","matiere":"matière","carriere":"carrière",
+  "frere":"frère","chere":"chère","legere":"légère","succes":"succès","progres":"progrès","acces":"accès",
+  "proces":"procès","exces":"excès","interet":"intérêt","benefice":"bénéfice","consequence":"conséquence",
+  "frequent":"fréquent","preferer":"préférer","proteger":"protéger","preparer":"préparer","presenter":"présenter",
+  "precis":"précis","precisement":"précisément","desole":"désolé","desolee":"désolée",
+  "arrivee":"arrivée","idee":"idée","idees":"idées",
+  "ecris":"écris","ecrit":"écrit","ecrite":"écrite","ecrire":"écrire","francais":"français",
+  "francaise":"française","musee":"musée","decide":"décidé","decider":"décider","motive":"motivé",
+  "grace":"grâce","ameliorer":"améliorer","ameliore":"améliore","etudier":"étudier","etudie":"étudie",
+  "esperer":"espérer","developpe":"développe","reference":"référence","opportunite":"opportunité",
+  "communaute":"communauté","diversite":"diversité","priorite":"priorité","responsabilite":"responsabilité",
+  "difficulte":"difficulté","capacite":"capacité","necessite":"nécessité","verite":"vérité",
+  "cinema":"cinéma","medecin":"médecin","metro":"métro","quebecois":"québécois","region":"région",
+  "reseau":"réseau","resoudre":"résoudre","reagir":"réagir","generation":"génération","creer":"créer",
+  "espece":"espèce","journee":"journée","soiree":"soirée","matinee":"matinée","entree":"entrée",
+  "sante":"santé","etes":"êtes","etais":"étais","etait":"était","etaient":"étaient","etions":"étions",
+  "montreal":"Montréal","quebec":"Québec","integration":"intégration","interet":"intérêt",
+  "prefere":"préfère","serieux":"sérieux","serieuse":"sérieuse","celebrer":"célébrer",
+  "amenagement":"aménagement","evenement":"événement","benevole":"bénévole","carriere":"carrière"
+,
+  "voila":"voilà","dela":"delà","tot":"tôt","plutot":"plutôt","bientot":"bientôt","hopital":"hôpital",
+  "role":"rôle","controle":"contrôle","meteo":"météo","numero":"numéro","telephone":"téléphone",
+  "television":"télévision","universite":"université","liberte":"liberté","egalite":"égalité","salarie":"salarié",
+  "employe":"employé","cafe":"café","cle":"clé","fevrier":"février","aout":"août"
+};
+
+(function(){
+  const sup = {};
+  Object.keys(ACCENTS).forEach(k=>{
+    const v = ACCENTS[k];
+    if(!/s$/.test(k) && !ACCENTS[k+'s']) sup[k+'s'] = v+'s';
+    if(/é$/.test(v)){
+      if(!ACCENTS[k+'e']) sup[k+'e'] = v+'e';
+      if(!ACCENTS[k+'es']) sup[k+'es'] = v+'es';
+    }
+  });
+  Object.assign(ACCENTS, sup);
+})();
+
+const LOC_A = ["partir","cause","propos","travers","nouveau","peine","condition","moins","savoir",
+  "peu","présent","distance","venir","l'heure","l'aise","l'avenir","l'étranger","l'inverse","l'écrit",
+  "temps","court","long","défaut","volonté","nouveau","juste titre","mon avis","votre avis","son avis",
+  "ce sujet","cet égard","cette occasion","ce propos","la fois","la maison","la place","la suite","la mienne"];
+const VERBES_A = ["grâce","grace","jusqu'","jusqu","quant","face","rapport","penser","pense","pensons","aider","aide","aidons",
+  "réussir","réussi","réussis","réussit","commencer","commence","commencé","continuer","continue","continué",
+  "arriver","arrive","arrivé","aller","vais","vas","va","allons","allez","vont","inviter","invite","invité",
+  "hésiter","hésite","apprendre","apprends","apprend","chercher","cherche","participer","participe","participé",
+  "assister","assiste","assisté","s'attendre","renoncer","renonce","contribuer","contribue","tient","tenir"];
+
+const CALQUES = [
+  {re:/\ben\s+(le|la|les)\s+/gi, code:'ESP', g:'haute',
+   m:'« en el / en la » → en français on dit **dans le, dans la, dans les** (ou au, à la, aux).'},
+  {re:/\bje suis d'accord avec que\b/gi, code:'ESP', g:'haute',
+   m:'« estoy de acuerdo con que » → **je suis d\'accord pour dire que** / **avec le fait que**.'},
+  {re:/\bbeaucoup des\b/gi, code:'ESP', g:'haute',
+   m:'« muchas de las » → **beaucoup de** + nom, sans article (beaucoup de gens).'},
+  {re:/\bla plupart de (le|la|les)\b/gi, code:'ESP', g:'haute', m:'→ **la plupart des** + nom pluriel.'},
+  {re:/\bje suis\s+\d+\s+ans\b/gi, code:'ESP', g:'haute', m:'« tengo X años » → **j\'ai X ans**.'},
+  {re:/\bje suis (faim|froid|chaud|raison|tort|peur|sommeil|besoin)\b/gi, code:'ESP', g:'haute',
+   m:'→ **avoir** faim / froid / chaud / raison / tort / peur / besoin.'},
+  {re:/\bil faut que\s+(je|tu|il|elle|on|nous|vous|ils|elles)\s+(peux|peut|dois|doit|suis|est|ai|a|vais|va|fais|fait|prends|prend|veux|veut)\b/gi,
+   code:'CONJ', g:'haute', m:'« il faut que » exige le **subjonctif** : que je puisse, que je doive, que je sois, que j\'aie, que j\'aille, que je fasse…'},
+  {re:/\b(pour que|bien que|avant que|afin que|jusqu'à ce que|à condition que)\s+(je|tu|il|elle|on|nous|vous|ils|elles)\s+(peux|peut|dois|doit|suis|est|es|ai|a|as|vais|va|fais|fait|veux|veut)\b/gi,
+   code:'CONJ', g:'haute', m:'Cette conjonction impose le **subjonctif**.'},
+  {re:/\bje pense que\s+[^.!?]{0,40}\b(soit|ait|puisse|fasse|aille|vienne)\b/gi, code:'CONJ', g:'moyenne',
+   m:'« je pense que » à la forme affirmative demande l\'**indicatif** : je pense que c\'est / qu\'il peut.'},
+  {re:/\b(essayer|essaie|essaye|décider|décide|oublier|oublie|refuser|refuse|choisir|choisis|accepter|accepte|éviter|évite|arrêter|arrête|permettre|permet|proposer|propose|mériter|mérite|risquer|risque)\s+(?!de\b|d')([a-zéèêàçûôî]+er|être|avoir|faire|aller|prendre|venir|dire|voir|partir|sortir|mettre|vivre)\b/gi,
+   code:'ESP', g:'haute', m:'En espagnol l\'infinitif est nu ; en français ces verbes exigent **de** : décider **de** partir, essayer **de** faire.'},
+  {re:/\b(commencer|commence|aider|aide|réussir|réussis|réussit|apprendre|apprends|apprend|hésiter|hésite|chercher|cherche|continuer|continue|arriver|arrive|encourager|encourage|inviter|invite)\s+(?!à\b|au\b|aux\b|de\b|d')([a-zéèêàçûôî]+er|être|avoir|faire|aller|prendre|venir|dire|voir|partir|sortir|mettre|vivre)\b/gi,
+   code:'ESP', g:'haute', m:'Ces verbes exigent **à** devant l\'infinitif : réussir **à** faire, aider **à** organiser.'},
+  {re:/\b(réalis(?:er|e|é|ons|ez))\s+(un|une|des|le|la|les|mon|ma|mes|ce|cette)\s+(voyage|activité|activités|cours|travail|réunion|étude|études|projet|démarche|démarches)\b/gi,
+   code:'ESP', g:'moyenne', m:'« realizar » → en français **faire**, **effectuer**, **mener** (faire un voyage, mener un projet). « Réaliser » = se rendre compte.'},
+  {re:/\bsalir\b/gi, code:'ESP', g:'haute', m:'Faux ami : « salir » en français = **rendre sale**. Pour « salir » espagnol → **sortir**.'},
+  {re:/\bassister\s+(un|une|le|la|les|mon|ma)\b/gi, code:'ESP', g:'moyenne', m:'**assister à** un cours. Et « asistir a alguien » = **aider** quelqu\'un.'},
+  {re:/\bquitter\s+(la table|les|la poussière)\b/gi, code:'ESP', g:'basse', m:'« quitar » = **enlever, retirer**. « Quitter » = abandonner un lieu ou une personne.'},
+  {re:/\bsubir\s+(les escaliers|au|à l')\b/gi, code:'ESP', g:'moyenne', m:'« subir » espagnol = **monter**. « Subir » français = endurer.'},
+  {re:/\bactuellement\s+je (suis|travaille|habite)\b/gi, code:'LEX', g:'basse', m:'Correct, mais variez : **à l\'heure actuelle**, **pour le moment**, **désormais**.'},
+  {re:/\b(dans|de|à)\s+le\s+(matin|soir|printemps)\b/gi, code:'GR', g:'moyenne', m:'→ **le matin**, **le soir**, **au printemps**.'},
+  {re:/\bdepuis\s+(hier|la semaine dernière|l'année dernière)\b/gi, code:'GR', g:'basse', m:'Vérifiez : action ponctuelle passée → **il y a**, action qui dure → **depuis**.'},
+  {re:/\bplus\s+de\s+que\b/gi, code:'ESP', g:'haute', m:'« más de que » → **plus que** ou **plus de** + nombre.'},
+  {re:/\bpour\s+que\s+(?:je|tu|il|elle|on|nous|vous|ils|elles)?\s*(?:[a-zéèêà]+er)\b/gi, code:'GR', g:'moyenne',
+   m:'« para + infinitif » → **pour** + infinitif (sans « que »). « Pour que » veut un sujet différent + subjonctif.'}
+];
+
+const PAUVRE = [
+  {re:/\btrès bien\b/gi, code:'LEX', g:'basse', m:'B2 : **remarquable**, **de grande qualité**, **particulièrement satisfaisant**.'},
+  {re:/\bil y a beaucoup de\b/gi, code:'LEX', g:'basse', m:'B2 : **on constate de nombreux…**, **les … se multiplient**, **un grand nombre de…**'},
+  {re:/\bc'est bien\b/gi, code:'LEX', g:'basse', m:'B2 : **c\'est une initiative pertinente / bénéfique / judicieuse**.'},
+  {re:/\bbeaucoup de choses\b/gi, code:'LEX', g:'basse', m:'Précisez : **de nombreux aspects**, **plusieurs éléments**, **divers points**.'},
+  {re:/\bles gens pensent\b/gi, code:'LEX', g:'basse', m:'B2 : **une partie de l\'opinion estime**, **certains observateurs considèrent**.'},
+  {re:/\bje pense que\b/gi, code:'LEX', g:'basse', m:'Variez : **j\'estime que**, **à mon sens**, **il me semble que**, **je suis convaincu que**.'}
+];
+
+const CONNECTEURS = ["d'abord","tout d'abord","premièrement","ensuite","puis","enfin","par ailleurs","de plus",
+  "en outre","également","cependant","toutefois","néanmoins","pourtant","en revanche","au contraire","alors que",
+  "tandis que","c'est pourquoi","par conséquent","donc","ainsi","en effet","car","parce que","puisque",
+  "étant donné que","en raison de","grâce à","à cause de","en somme","en conclusion","pour conclure",
+  "en définitive","d'une part","d'autre part","non seulement","mais aussi","certes","or","bref","au demeurant"];
+
+const MARQ_TU = /\b(tu|te|toi|ton|ta|tes|t'as|t'es|toi-même)\b/gi;
+const MARQ_VOUS = /\b(vous|votre|vos|vous-même)\b/gi;
+
+function analyser(txt){
+  const out = [];
+  const push = (i,l,code,g,msg)=>{ if(l>0) out.push({i:i,l:l,code:code,g:g,msg:msg}); };
+  let m;
+
+  // --- registre tu / vous ---
+  const tus=[], vs=[];
+  MARQ_TU.lastIndex=0; while((m=MARQ_TU.exec(txt))) tus.push(m);
+  MARQ_VOUS.lastIndex=0; while((m=MARQ_VOUS.exec(txt))) vs.push(m);
+  if(tus.length && vs.length){
+    const min = tus.length<=vs.length ? tus : vs;
+    const autre = tus.length<=vs.length ? 'vous' : 'tu';
+    min.forEach(x=>push(x.index,x[0].length,'REG','haute',
+      'Mélange de registres : le reste de la copie utilise **'+autre+'**. Choisissez-en un et tenez-le du début à la fin — c\'est l\'erreur qui coûte le plus cher en pertinence.'));
+  }
+
+  // --- accents manquants ---
+  const motRe = /[A-Za-zÀ-ÿ']+/g;
+  while((m=motRe.exec(txt))){
+    const bas = m[0].toLowerCase();
+    if(ACCENTS[bas] && ACCENTS[bas]!==bas && bas!=='du' && bas!=='sur'){
+      push(m.index,m[0].length,'ORT','haute','Accent manquant → **'+ACCENTS[bas]+'**');
+    }
+  }
+
+  // --- a / à ---
+  const aRe = new RegExp("\\ba\\s+(" + LOC_A.join("|") + ")\\b","gi");
+  while((m=aRe.exec(txt))){
+    const av = txt.slice(Math.max(0,m.index-16),m.index).toLowerCase();
+    if(/\b(il|elle|on|qui|y|n'|ça|cela|ce|il y)\s*$/.test(av)) continue;
+    push(m.index,1,'ORT','haute','**à** (préposition) prend un accent. « a » sans accent, c\'est le verbe avoir.');
+  }
+  const aRe3 = new RegExp("\\b(" + VERBES_A.join("|") + ")\\s*a\\b","gi");
+  while((m=aRe3.exec(txt))) push(m.index+m[0].length-1,1,'ORT','haute','Après « '+m[1]+' » on écrit **à** avec accent.');
+  const aRe4 = /\ba\s+(?=[A-ZÀ-Þ][a-zà-ÿ]{2,})/g;
+  while((m=aRe4.exec(txt))){
+    const av = txt.slice(Math.max(0,m.index-16),m.index).toLowerCase();
+    if(/\b(il|elle|on|qui|y|n'|ça|cela|ce)\s*$/.test(av)) continue;
+    push(m.index,1,'ORT','moyenne','Devant un nom de lieu ou de personne, c\'est la préposition **à** : « à Montréal ».');
+  }
+  const aRe2 = /\b(il|elle|on|qui|y|ça|cela)\s+à\b/gi;
+  while((m=aRe2.exec(txt))) push(m.index+m[0].length-1,1,'ORT','haute','Ici c\'est le verbe **avoir** : « a » sans accent.');
+
+  // --- ou / où ---
+  const ouRe = /\b(là|le jour|au moment|l'endroit|la ville|le pays|la région|le quartier|c'est là)\s+ou\b/gi;
+  while((m=ouRe.exec(txt))) push(m.index+m[0].length-2,2,'ORT','moyenne','Lieu ou moment → **où** avec accent.');
+
+  // --- sa / ça ---
+  const saRe = /\bsa\s+(fait|va|me|te|se|est|serait|dépend|marche|permet|m'|t')/gi;
+  while((m=saRe.exec(txt))) push(m.index,2,'ORT','moyenne','→ **ça** (pronom démonstratif). « sa » = possessif.');
+
+  // --- élision ---
+  const elRe = /\b(je|me|te|se|ne|de|le|la|que|jusque|lorsque|puisque|si)\s+(?=(a|e|é|è|ê|i|o|u|â|î|ô|û|y)[a-zà-ÿ])/gi;
+  while((m=elRe.exec(txt))){
+    const mot = m[1].toLowerCase();
+    const suite = txt.slice(m.index+m[0].length).split(/\s/)[0];
+    if(mot==='si'){
+      if(/^il/i.test(suite)) push(m.index,m[0].length-1,'ORT','haute','**s\'il** / **s\'ils** (élision uniquement devant « il »).');
+      continue;
+    }
+    push(m.index,m[0].length-1,'ORT','haute','Élision obligatoire → **'+mot.slice(0,-1)+"'"+suite+'**');
+  }
+
+  // --- contractions ---
+  const ctRe = /\b(de|à)\s+(le|les)\b/gi;
+  while((m=ctRe.exec(txt))){
+    const p=m[1].toLowerCase(), a=m[2].toLowerCase();
+    const attendu = p==='de' ? (a==='le'?'du':'des') : (a==='le'?'au':'aux');
+    push(m.index,m[0].length,'GR','moyenne','Contraction → **'+attendu+'** (sauf si « le / les » est un pronom : « j\'essaie de le faire »).');
+  }
+
+  // --- calques & lexique ---
+  [...CALQUES,...PAUVRE].forEach(r=>{
+    r.re.lastIndex=0;
+    while((m=r.re.exec(txt))){ push(m.index,m[0].length,r.code,r.g,r.m); if(m[0].length===0) r.re.lastIndex++; }
+  });
+
+  // --- répétitions ---
+  const stop = new Set(['dans','pour','avec','cette','leur','leurs','nous','vous','elle','elles','ils','plus','mais',
+    'aussi','très','tout','tous','toute','toutes','être','avoir','faire','sont','était','étaient','avez','avons',
+    'parce','comme','bien','sans','déjà','même','entre','alors','donc','peut','peuvent','doit','doivent','quand',
+    'ainsi','depuis','chaque','autre','autres','celui','celle','ceux','notre','nos','votre','vos','beaucoup']);
+  const cnt = {}, pos = {};
+  motRe.lastIndex=0;
+  while((m=motRe.exec(txt))){
+    const b=m[0].toLowerCase();
+    if(b.length<5||stop.has(b)) continue;
+    cnt[b]=(cnt[b]||0)+1; (pos[b]=pos[b]||[]).push(m);
+  }
+  Object.keys(cnt).forEach(b=>{
+    if(cnt[b]>=3) pos[b].slice(2).forEach(x=>push(x.index,x[0].length,'LEX','basse',
+      'Répété '+cnt[b]+' fois. Un jury B2 attend une reformulation : synonyme, pronom ou tournure nominale.'));
+  });
+
+  // --- phrases trop longues ---
+  let debut=0;
+  txt.split(/(?<=[.!?])\s+/).forEach(ph=>{
+    const nm = ph.trim().split(/\s+/).filter(Boolean).length;
+    if(nm>38) push(debut,Math.min(ph.length,60),'COH','moyenne','Phrase de '+nm+' mots : coupez-la en deux. Les périodes trop longues font perdre les accords.');
+    debut += ph.length+1;
+  });
+
+  out.sort((a,b)=>a.i-b.i || b.l-a.l);
+  const propre=[]; let fin=-1;
+  out.forEach(e=>{ if(e.i>=fin){propre.push(e); fin=e.i+e.l;} });
+  return propre;
+}
+
+/* ============================================================
+   3. RENDU DE L'ÉDITEUR
+   ============================================================ */
+const $ = s=>document.querySelector(s);
+const ta = $('#redaction'), calque = $('#calque'), gouttiere = $('#gouttiere');
+const esc = t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const gras = t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b style="color:#fff">$1</b>');
+const grasClair = t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+
+function chipsTaches(){
+  $('#taches').innerHTML = Object.keys(TACHES).map(k=>{
+    const t=TACHES[k];
+    return '<button class="tache" data-t="'+k+'" aria-pressed="'+(k==tacheActive)+'"><b>'+t.titre+'</b><span>'+t.type+' · '+t.min+'–'+t.max+' mots</span></button>';
+  }).join('');
+  $('#taches').querySelectorAll('.tache').forEach(b=>b.addEventListener('click',()=>{
+    tacheActive = +b.dataset.t; chipsTaches(); majTout(); resetChrono();
+  }));
+  const t=TACHES[tacheActive];
+  $('#rappel-mots').textContent = t.min+'–'+t.max+' mots · '+t.minutes+' min conseillées';
+  $('#cible-mots').textContent = 'mots · viser '+t.cible[0]+'–'+t.cible[1];
+}
+
+function compterMots(txt){ return (txt.trim().match(/[\wÀ-ÿ'’-]+/g)||[]).length; }
+
+let erreursLive = [];
+function majTout(){
+  const txt = ta.value;
+  erreursLive = analyser(txt);
+  peindre(txt, erreursLive);
+  majCompteur(txt);
+  panneauLive(txt, erreursLive);
+  ta.style.height='auto';
+  ta.style.height = Math.max(340, ta.scrollHeight)+'px';
+  requestAnimationFrame(()=>marges());
+}
+
+function peindre(txt, errs){
+  let h='', pos=0;
+  errs.forEach((e,idx)=>{
+    h += esc(txt.slice(pos,e.i));
+    h += '<mark class="e-'+e.g+'" data-idx="'+idx+'">'+esc(txt.substr(e.i,e.l))+'</mark>';
+    pos = e.i+e.l;
+  });
+  h += esc(txt.slice(pos)) + '\n';
+  calque.innerHTML = h;
+}
+
+function marges(){
+  const marks = calque.querySelectorAll('mark');
+  const base = calque.getBoundingClientRect().top;
+  const groupes = {};
+  marks.forEach(mk=>{
+    const y = Math.round((mk.getBoundingClientRect().top - base)/2)*2;
+    const e = erreursLive[+mk.dataset.idx];
+    if(!groupes[y]) groupes[y] = {};
+    const rang = {haute:3,moyenne:2,basse:1}[e.g];
+    if(!groupes[y][e.code] || groupes[y][e.code].r < rang) groupes[y][e.code] = {r:rang,g:e.g};
+  });
+  gouttiere.innerHTML = Object.keys(groupes).map(y=>{
+    return Object.keys(groupes[y]).slice(0,2).map((code,n)=>
+      '<span class="annot e-'+groupes[y][code].g+'" style="top:'+(+y+4+n*15)+'px">'+code+'</span>').join('');
+  }).join('');
+}
+
+function majCompteur(txt){
+  const n = compterMots(txt), t = TACHES[tacheActive];
+  $('#nb-mots').textContent = n;
+  const barre = $('#barre-mots'), i = barre.querySelector('i');
+  i.style.width = Math.min(100, n/t.max*100)+'%';
+  barre.classList.toggle('ok', n>=t.min && n<=t.max);
+  barre.classList.toggle('trop', n>t.max);
+}
+
+function panneauLive(txt, errs){
+  const t = TACHES[tacheActive];
+  const par = code=>errs.filter(e=>e.code===code);
+  const conn = CONNECTEURS.filter(c=>new RegExp('\\b'+c.replace(/'/g,"['’]")+'\\b','i').test(txt));
+  const paragraphes = txt.trim() ? txt.trim().split(/\n\s*\n/).length : 0;
+  const phrases = txt.trim() ? txt.split(/[.!?]+/).filter(p=>p.trim().length>1).length : 0;
+  const nMots = compterMots(txt);
+  const moy = phrases ? Math.round(nMots/phrases) : 0;
+
+  const tu = (txt.match(MARQ_TU)||[]).length, vs = (txt.match(MARQ_VOUS)||[]).length;
+  let regTitre, regClasse, regItems;
+  if(tu && vs){ regClasse='p-ko'; regTitre='Registre mélangé'; regItems=['<li><span class="fleche">!</span><div>'+tu+' marque'+(tu>1?'s':'')+' de <code>tu</code> et '+vs+' de <code>vous</code>. Le jury sanctionne immédiatement la pertinence. Décidez maintenant, puis relisez uniquement pour cela.</div></li>']; }
+  else if(tu){ regClasse='p-ok'; regTitre='Registre : tutoiement'; regItems=['<li><span class="fleche">✓</span><div>Cohérent sur '+tu+' marque'+(tu>1?'s':'')+'. Vérifiez que la consigne autorise le <code>tu</code> (ami, collègue proche, famille).</div></li>']; }
+  else if(vs){ regClasse='p-ok'; regTitre='Registre : vouvoiement'; regItems=['<li><span class="fleche">✓</span><div>Cohérent sur '+vs+' marque'+(vs>1?'s':'')+'. Gardez aussi les formules soutenues jusqu\'à la clôture.</div></li>']; }
+  else { regClasse='p-am'; regTitre='Registre non marqué'; regItems=['<li class="vide">Aucun <code>tu</code> ni <code>vous</code> détecté. Adressez-vous explicitement au destinataire.</li>']; }
+
+  const bloc = (id,titre,classe,n,items)=>
+    '<section class="section-live"><div class="titre"><span class="pastille '+classe+'">'+n+'</span>'+titre+'</div><ul class="liste-live">'+
+    (items.length?items.join(''):'<li class="vide">Rien à signaler pour le moment.</li>')+'</ul></section>';
+
+  const ligne = e=>'<li><span class="fleche">'+(e.g==='haute'?'✕':e.g==='moyenne'?'!':'·')+'</span><div><code>'+esc(txt.substr(e.i,e.l).trim()||'—')+'</code> '+gras(e.msg)+'</div></li>';
+
+  const ort = par('ORT').concat(par('GR'));
+  const esp = par('ESP').concat(par('CONJ'));
+  const lex = par('LEX');
+
+  let coh = [];
+  coh.push('<li><span class="fleche">'+(conn.length>=4?'✓':'!')+'</span><div><b style="color:#fff">'+conn.length+'</b> connecteur'+(conn.length>1?'s':'')+' logique'+(conn.length>1?'s':'')+' repéré'+(conn.length>1?'s':'')+(conn.length?' : '+conn.slice(0,6).map(c=>'<code>'+c+'</code>').join(' ')+'.':'.')+' Un B2 en articule au moins 4 ou 5.</div></li>');
+  coh.push('<li><span class="fleche">·</span><div>'+phrases+' phrases, '+moy+' mots par phrase en moyenne, '+paragraphes+' paragraphe'+(paragraphes>1?'s':'')+'. '+(moy>28?'Coupez : au-delà de 25 mots les accords décrochent.':moy&&moy<9?'Enchaînez certaines phrases avec un connecteur pour montrer la subordination.':'Longueur adaptée au niveau B2.')+'</div></li>');
+  par('COH').forEach(e=>coh.push(ligne(e)));
+
+  const st = structure(txt, tacheActive);
+  const faits = st.filter(x=>x[1]).length;
+  const stItems = st.map(x=>'<li><span class="fleche" style="color:'+(x[1]?'#6FD3A9':'var(--encre-3)')+'">'+(x[1]?'✓':'○')+'</span><div><b style="color:'+(x[1]?'#fff':'#C3CDDA')+'">'+esc(x[0])+'</b>'+(x[1]?'':' — '+esc(x[2]))+'</div></li>');
+  if(t.parties){
+    const c = couperT3(txt), na = motsDe(c.a), nb = motsDe(c.b);
+    const jauge = (p,n)=>'<li><span class="fleche">'+(n>=p.min&&n<=p.max?'✓':'!')+'</span><div><b style="color:#fff">'+esc(p.nom)+'</b> : '+n+' mots sur '+p.min+'–'+p.max+
+      '<div class="barre-mots" style="width:100%;margin-top:5px;background:rgba(255,255,255,.12)"><i style="width:'+Math.min(100,n/p.max*100)+'%;background:'+(n>=p.min&&n<=p.max?'#6FD3A9':'#E5B549')+'"></i></div></div></li>';
+    stItems.push(jauge(t.parties[0],na));
+    stItems.push(jauge(t.parties[1],nb));
+  }
+  const formules = '<div style="padding:0 16px 14px" class="tirettes">'+
+    t.formules.map(f=>'<span class="tirette" data-f="'+esc(f)+'" style="background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#D8E0EA;font-size:12.5px">'+esc(f.trim())+'</span>').join('')+'</div>';
+
+  $('#live').innerHTML =
+    bloc('str','Structure de la '+t.titre.toLowerCase(), faits===st.length?'p-ok':'p-am', faits+'/'+st.length, stItems) +
+    '<section class="section-live"><div class="titre"><span class="pastille p-ok">+</span>Formules à insérer</div>'+formules+'</section>' +
+    bloc('reg',regTitre,regClasse,(tu&&vs)?'!':'✓',regItems) +
+    bloc('ort','Orthographe, accents, articles',ort.length?'p-ko':'p-ok',ort.length||'✓',ort.map(ligne)) +
+    bloc('esp','Interférences de l\'espagnol',esp.length?'p-ko':'p-ok',esp.length||'✓',esp.map(ligne)) +
+    bloc('lex','Richesse lexicale',lex.length?'p-am':'p-ok',lex.length||'✓',lex.map(ligne)) +
+    bloc('coh','Cohérence et structure','p-am',conn.length,coh);
+
+  const h = errs.filter(e=>e.g==='haute').length;
+  $('#total-live').textContent = errs.length ? errs.length+' signalements · '+h+' graves' : '';
+}
+
+$('#live').addEventListener('click',e=>{
+  const el = e.target.closest('.tirette'); if(!el) return;
+  const f = el.dataset.f, d = ta.selectionStart!=null ? ta.selectionStart : ta.value.length;
+  ta.value = ta.value.slice(0,d)+f+ta.value.slice(d);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = d+f.length; majTout();
+});
+
+ta.addEventListener('input',majTout);
+ta.addEventListener('scroll',()=>{calque.scrollTop=ta.scrollTop});
+window.addEventListener('resize',()=>requestAnimationFrame(marges));
+
+$('#btn-vider').addEventListener('click',()=>{
+  if(ta.value && !confirm('Effacer la copie en cours ?')) return;
+  ta.value=''; majTout(); $('#resultat').classList.remove('visible'); ta.focus();
+});
+
+/* ---------- chrono ---------- */
+let chronoId=null, reste=0;
+function fmt(s){ const m=Math.floor(s/60); return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function resetChrono(){
+  clearInterval(chronoId); chronoId=null;
+  reste = TACHES[tacheActive].minutes*60;
+  $('#chrono').textContent = fmt(reste);
+  $('#chrono').classList.remove('alerte');
+  $('#btn-chrono').textContent = 'Démarrer le chrono';
+}
+$('#btn-chrono').addEventListener('click',()=>{
+  if(chronoId){ resetChrono(); return; }
+  $('#btn-chrono').textContent = 'Arrêter';
+  chronoId = setInterval(()=>{
+    reste--; $('#chrono').textContent = fmt(Math.max(0,reste));
+    if(reste<=120) $('#chrono').classList.add('alerte');
+    if(reste<=0){ clearInterval(chronoId); chronoId=null; $('#btn-chrono').textContent='Temps écoulé'; }
+  },1000);
+});
+
+/* ============================================================
+   4. CORRECTION COMPLÈTE (professeur TCF)
+   ============================================================ */
+const NCLC = n => n>=16?'10+': n>=14?'9': n>=12?'8': n>=10?'7': n>=8?'6': n>=6?'5':'4 ou moins';
+
+function invite(consigne, copie, t, nMots){
+  return `Tu es correcteur habilité de l'épreuve d'expression écrite du TCF Canada et professeur de FLE depuis vingt ans. Tu corriges la copie d'un candidat hispanophone qui vise le NCLC 7 (B2, 10-11/20) et si possible le NCLC 8 (12-13/20).
+
+TÂCHE ${t.titre} — ${t.type}. Attendu : ${t.attendu}
+Longueur exigée : ${t.min} à ${t.max} mots. La copie en compte ${nMots}.
+${t.parties ? 'Répartition interne obligatoire : ' + t.parties.map(x=>x.nom+' '+x.min+' à '+x.max+' mots').join(' ; ') + '. Vérifie-la et signale tout déséquilibre.' : ''}
+Plan attendu, à vérifier point par point :
+${t.plan.map((x,n)=>(n+1)+'. '+x[0]+' — '+x[1]).join('\n')}
+Hors des bornes de mots, la tâche peut être évaluée « A1 non atteint » : dis-le sans détour si c'est le cas.
+
+CONSIGNE :
+"""${consigne || '(non fournie — évalue la copie sur ses seules qualités linguistiques et signale que la consigne manque)'}"""
+
+COPIE :
+"""${copie}"""
+
+Barème officiel, quatre critères sur 5 : pertinence (consigne, destinataire, registre), cohérence et structure (plan, connecteurs, paragraphes), richesse lexicale, correction grammaticale.
+
+Faiblesses connues de ce candidat, à traquer en priorité : mélange tu/vous dans un même texte ; accents porteurs de sens (à/a, où/ou), élisions (j'espère, d'être), contractions (du, au, des, aux) ; calques syntaxiques de l'espagnol (préposition après verbe, subjonctif après « il faut que », « en le » pour « dans le »).
+
+Réponds UNIQUEMENT par un objet JSON valide, sans texte autour ni balises de code. Sois bref dans chaque champ : une phrase suffit. Maximum 10 erreurs, les plus coûteuses d'abord.
+{
+ "note20": entier de 1 à 20,
+ "cecrl": "A2"|"B1"|"B1+"|"B2"|"B2+"|"C1",
+ "verdict": "deux phrases : ce que la copie réussit, ce qui la bloque",
+ "longueur_ok": true/false,
+ "criteres": [{"nom":"Pertinence","note":n},{"nom":"Cohérence et structure","note":n},{"nom":"Richesse lexicale","note":n},{"nom":"Correction grammaticale","note":n}],
+ "commentaires": ["un commentaire court par critère, dans le même ordre"],
+ "erreurs": [{"code":"REG|ORT|GR|CONJ|ESP|LEX|COH","gravite":"haute|moyenne|basse","original":"passage fautif","correction":"version correcte","explication":"la règle en une phrase","es":"la même règle en espagnol"}],
+ "points_forts": ["deux à quatre éléments réussis"],
+ "gap_7": {"atteint": true/false, "manque":["ce qui sépare la copie du NCLC 7"], "actions":["gestes concrets pour la prochaine copie"]},
+ "gap_8": {"manque":["…"], "actions":["…"]}
+}
+N'invente aucune erreur. Sois exigeant : une copie correcte mais plate vaut 9 ou 10, pas 13.`;
+}
+
+function inviteModele(consigne, copie, t){
+  return `Tu es professeur de FLE. Voici la copie d'un candidat hispanophone à la ${t.titre} du TCF Canada (${t.type}, ${t.min} à ${t.max} mots).
+${t.parties ? 'Répartition : ' + t.parties.map(x=>x.nom+' '+x.min+'–'+x.max+' mots').join(' ; ') + '.' : ''}
+Plan attendu : ${t.plan.map(x=>x[0]).join(' › ')}
+
+CONSIGNE : """${consigne || '(non fournie)'}"""
+COPIE : """${copie}"""
+
+Réécris cette copie au niveau B2 solide, en gardant exactement les mêmes idées et le même contenu que le candidat, en respectant les bornes de mots et le plan attendu. Puis donne quatre à six tournures B2 tirées de ta réécriture, prêtes à être réemployées à l'examen.
+
+Format de réponse, sans rien d'autre :
+MODÈLE
+(le texte réécrit)
+FORMULES
+- première tournure
+- deuxième tournure
+- …`;
+}
+
+async function appelAPI(prompt){
+  const r = await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({model:"claude-sonnet-4-6", max_tokens:1000, messages:[{role:"user",content:prompt}]})
+  });
+  const brut = await r.text();
+  let d;
+  try{ d = JSON.parse(brut); }
+  catch(e){ throw new Error('Réponse illisible du serveur (HTTP '+r.status+') : '+brut.slice(0,180)); }
+  if(d && d.error) throw new Error(d.error.message || 'erreur renvoyée par le service');
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const txt = (d.content||[]).filter(c=>c && c.type==='text').map(c=>c.text).join('\n').trim();
+  if(!txt) throw new Error('réponse vide');
+  return txt;
+}
+
+function profondeurs(s){
+  let inS=false, ech=false, pile=[];
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
+    if(ech){ ech=false; continue; }
+    if(inS){ if(c==='\\') ech=true; else if(c==='"') inS=false; continue; }
+    if(c==='"'){ inS=true; continue; }
+    if(c==='{') pile.push('}');
+    else if(c==='[') pile.push(']');
+    else if(c==='}'||c===']') pile.pop();
+  }
+  return pile;
+}
+
+function lireJSON(t){
+  let s = String(t).replace(/^```(?:json)?/i,'').replace(/```\s*$/,'').trim();
+  const i = s.indexOf('{');
+  if(i<0) return null;
+  s = s.slice(i);
+  try{ return JSON.parse(s); }catch(e){}
+  const j = s.lastIndexOf('}');
+  if(j>0){ try{ return JSON.parse(s.slice(0,j+1)); }catch(e){} }
+  // réponse tronquée : on coupe au dernier élément complet et on referme
+  let inS=false, ech=false, pile=[], coupe=-1;
+  for(let k=0;k<s.length;k++){
+    const c=s[k];
+    if(ech){ ech=false; continue; }
+    if(inS){ if(c==='\\') ech=true; else if(c==='"') inS=false; continue; }
+    if(c==='"'){ inS=true; continue; }
+    if(c==='{') pile.push('}');
+    else if(c==='[') pile.push(']');
+    else if(c==='}'||c===']'){ pile.pop(); if(pile.length<=2) coupe=k; }
+  }
+  if(coupe<0) return null;
+  let bout = s.slice(0,coupe+1);
+  const reste = profondeurs(bout);
+  while(reste.length) bout += reste.pop();
+  try{ return JSON.parse(bout); }catch(e){ return null; }
+}
+
+async function corriger(){
+  const copie = ta.value.trim();
+  const consigne = $('#consigne').value.trim();
+  const t = TACHES[tacheActive];
+  const btn = $('#btn-corriger'), pan = $('#resultat');
+
+  if(compterMots(copie) < 25){
+    pan.classList.add('visible');
+    pan.innerHTML = '<div class="bloc"><h3>Copie trop courte</h3><p style="margin:0;font-size:13.5px">Rédigez au moins une trentaine de mots avant de demander la correction. La cible pour la '+t.titre.toLowerCase()+' est de '+t.min+' à '+t.max+' mots.</p></div>';
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Correction en cours…';
+  pan.classList.add('visible');
+  pan.innerHTML = '<div class="charge"><span class="spin"></span>Le correcteur applique le barème et relève les erreurs.</div>';
+  pan.scrollIntoView({behavior:'smooth',block:'nearest'});
+
+  let brut = '';
+  try{
+    brut = await appelAPI(invite(consigne, copie, t, compterMots(copie)));
+    const r = lireJSON(brut);
+    if(!r) throw new Error('__brut__');
+    afficherResultat(r);
+  }catch(err){
+    if(String(err.message)==='__brut__'){
+      pan.innerHTML = '<div class="entete-carte"><h2>Correction · '+esc(t.titre)+'</h2></div>'+
+        '<div class="bloc"><h3>Correction en texte brut</h3><p style="margin:0 0 10px;font-size:12.5px;color:var(--encre-2)">Le barème détaillé n\'a pas pu être mis en forme, mais voici l\'analyse telle que le correcteur l\'a rédigée.</p>'+
+        '<div class="modele">'+esc(brut)+'</div></div>';
+    }else{
+      pan.innerHTML = '<div class="bloc"><h3>La correction n\'a pas abouti</h3>'+
+        '<p style="margin:0 0 10px;font-size:13.5px">'+esc(String(err && err.message || err))+'</p>'+
+        '<p style="margin:0 0 12px;font-size:13.5px;color:var(--encre-2)">Relancez la correction : cette interruption est presque toujours passagère. Si elle revient, raccourcissez la consigne collée. La marge du correcteur, à droite, continue de travailler sans connexion.</p>'+
+        '<button class="bouton principal" id="btn-reessayer">Relancer la correction</button></div>';
+      const br = $('#btn-reessayer'); if(br) br.addEventListener('click',corriger);
+    }
+    btn.disabled = false; btn.textContent = 'Corriger ma copie';
+    return;
+  }
+
+  btn.textContent = 'Réécriture B2 en cours…';
+  const zone = document.createElement('div');
+  zone.className = 'bloc';
+  zone.innerHTML = '<div class="charge" style="padding:0"><span class="spin"></span>Rédaction du modèle B2 et des tournures à réemployer.</div>';
+  pan.appendChild(zone);
+
+  try{
+    const rep = await appelAPI(inviteModele(consigne, copie, t));
+    const mm = rep.split(/FORMULES/i);
+    const modele = mm[0].replace(/^\s*MODÈLE\s*/i,'').trim();
+    const formules = (mm[1]||'').split(/\n/).map(l=>l.replace(/^\s*[-•*\d.)\s]+/,'').trim()).filter(l=>l.length>3);
+    afficherModele(zone, modele, formules);
+  }catch(err){
+    zone.innerHTML = '<h3>Réécriture B2</h3><p style="margin:0 0 10px;font-size:13.5px">'+esc(String(err && err.message || err))+'</p>'+
+      '<button class="bouton" id="btn-modele-retry">Demander la réécriture</button>';
+    const b2 = $('#btn-modele-retry');
+    if(b2) b2.addEventListener('click',async()=>{
+      zone.innerHTML = '<div class="charge" style="padding:0"><span class="spin"></span>Rédaction du modèle B2.</div>';
+      try{
+        const rep = await appelAPI(inviteModele(consigne, copie, t));
+        const mm = rep.split(/FORMULES/i);
+        afficherModele(zone, mm[0].replace(/^\s*MODÈLE\s*/i,'').trim(),
+          (mm[1]||'').split(/\n/).map(l=>l.replace(/^\s*[-•*\d.)\s]+/,'').trim()).filter(l=>l.length>3));
+      }catch(e){ zone.innerHTML = '<h3>Réécriture B2</h3><p style="margin:0;font-size:13.5px">'+esc(String(e.message||e))+'</p>'; }
+    });
+  }finally{
+    btn.disabled = false; btn.textContent = 'Corriger ma copie';
+  }
+}
+
+function afficherModele(zone, modele, formules){
+  zone.innerHTML = '<h3>La même copie, rédigée en B2 — '+compterMots(modele)+' mots</h3>'+
+    '<div class="modele">'+esc(modele)+'</div>'+
+    '<div style="margin-top:10px"><button class="bouton" id="btn-modele">Charger ce modèle dans l\'éditeur</button> <button class="bouton" id="btn-copier">Copier le modèle</button></div>'+
+    (formules.length?'<h3 style="margin-top:16px">Tournures à réemployer</h3><div class="tirettes">'+
+      formules.map(p=>'<span class="tirette" data-p="'+esc(p)+'">'+esc(p)+'</span>').join('')+'</div>'+
+      '<p style="margin:10px 0 0;font-size:12.5px;color:var(--encre-2)">Cliquez une tournure pour l\'insérer à l\'endroit du curseur.</p>':'');
+
+  $('#btn-modele').addEventListener('click',()=>{ ta.value = modele; majTout(); ta.focus(); });
+  const bc = $('#btn-copier');
+  bc.addEventListener('click',()=>{
+    try{ navigator.clipboard.writeText(modele); bc.textContent='Copié'; }
+    catch(e){ bc.textContent='Sélectionnez le texte'; }
+    setTimeout(()=>bc.textContent='Copier le modèle',1600);
+  });
+  zone.querySelectorAll('.tirette').forEach(el=>el.addEventListener('click',()=>{
+    const p = el.dataset.p, d = ta.selectionStart!=null ? ta.selectionStart : ta.value.length;
+    ta.value = ta.value.slice(0,d)+p+ta.value.slice(d);
+    ta.focus(); ta.selectionStart = ta.selectionEnd = d+p.length; majTout();
+  }));
+}
+$('#btn-corriger').addEventListener('click',corriger);
+
+function afficherResultat(r){
+  const note = Math.max(1,Math.min(20, +r.note20||0));
+  const nclc = NCLC(note);
+  const atteint7 = note>=10, atteint8 = note>=12;
+
+  const com = r.commentaires||[];
+  const crit = (r.criteres||[]).map((c,n)=>{
+    const p = Math.round((+c.note||0)/5*100);
+    const cl = c.note>=4?'bon':c.note>=3?'moyen':'faible';
+    return '<div class="critere"><div class="ligne1"><span class="nom">'+esc(c.nom)+'</span><span class="sc">'+(+c.note||0)+' / 5</span></div>'+
+           '<div class="rail"><i class="'+cl+'" style="width:'+p+'%"></i></div><p>'+esc(c.commentaire||com[n]||'')+'</p></div>';
+  }).join('');
+
+  const errs = (r.erreurs||[]).map(e=>
+    '<div class="err g-'+esc(e.gravite||'haute')+'"><span class="tag">'+esc(e.code||'GR')+'</span>'+
+    '<div class="paire"><s>'+esc(e.original||'')+'</s> <span style="color:var(--encre-3)">→</span> <b>'+esc(e.correction||'')+'</b></div>'+
+    '<p class="exp">'+esc(e.explication||'')+(e.es?' <span style="color:var(--bleu)">· '+esc(e.es)+'</span>':'')+'</p></div>').join('');
+
+  const listeGap = g => '<ul class="puces">'+((g&&g.manque)||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'+
+    '<h3 style="margin-top:12px">Ce qu\'il faut faire dès la prochaine copie</h3><ul class="puces">'+
+    ((g&&g.actions)||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+
+  $('#resultat').innerHTML =
+   '<div class="entete-carte"><h2>Correction · '+esc(TACHES[tacheActive].titre)+'</h2><span style="font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--encre-3)">'+((r.erreurs||[]).length)+' erreurs relevées</span></div>'+
+   '<div class="note-bloc">'+
+     '<div class="note-grande"><div class="val">'+note+'<small>/20</small></div><div class="lbl">note TCF</div></div>'+
+     '<div class="badges">'+
+       '<div class="badge"><div class="k">CECRL</div><div class="v">'+esc(r.cecrl||'—')+'</div></div>'+
+       '<div class="badge '+(atteint7?'cible-atteinte':'cible-manquee')+'"><div class="k">NCLC / CLB</div><div class="v">'+nclc+'</div></div>'+
+       '<div class="badge '+(r.longueur_ok===false?'cible-manquee':'')+'"><div class="k">Longueur</div><div class="v">'+compterMots(ta.value)+' mots</div></div>'+
+       '<div class="badge"><div class="k">Objectif</div><div class="v">'+(atteint8?'NCLC 8 tenu':atteint7?'NCLC 7 tenu':'NCLC 7 manqué')+'</div></div>'+
+     '</div></div>'+
+   (r.verdict?'<div class="bloc"><h3>Verdict du correcteur</h3><p style="margin:0;font-family:var(--serif);font-size:16px;line-height:1.6">'+esc(r.verdict)+'</p></div>':'')+
+   '<div class="criteres">'+crit+'</div>'+
+   (errs?'<div class="bloc"><h3>Relevé d\'erreurs, de la plus coûteuse à la plus légère</h3>'+errs+'</div>':'')+
+   ((r.points_forts||[]).length?'<div class="bloc"><h3>Ce qui fonctionne déjà</h3><ul class="puces">'+r.points_forts.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'')+
+   '<div class="bloc"><h3>'+(atteint7?'Consolider le NCLC 7':'Écart jusqu\'au NCLC 7 (10–11/20)')+'</h3>'+listeGap(r.gap_7)+'</div>'+
+   '<div class="bloc"><h3>Écart jusqu\'au NCLC 8 (12–13/20)</h3>'+listeGap(r.gap_8)+'</div>'+
+   '';
+
+}
+
+chipsTaches(); resetChrono(); majTout();
+
+/* ============================================================
+   5. MOTEUR DE CONJUGAISON
+   ============================================================ */
+const PRON = ['je','tu','il / elle / on','nous','vous','ils / elles'];
+const PRON_SUJ = ['je','tu','il','nous','vous','ils'];
+const REFL = ['me','te','se','nous','vous','se'];
+const F_IMP = ['ais','ais','ait','ions','iez','aient'];
+const F_FUT = ['ai','as','a','ons','ez','ont'];
+
+function joindre(rad, term){
+  if(/ç$/.test(rad) && /^[ieé]/.test(term)) rad = rad.slice(0,-1)+'c';
+  if(/ge$/.test(rad) && /^[ieé]/.test(term)) rad = rad.slice(0,-1);
+  if(/c$/.test(rad) && /^[aoâ]/.test(term)) rad = rad.slice(0,-1)+'ç';
+  if(/g$/.test(rad) && /^[aoâ]/.test(term)) rad = rad+'e';
+  return rad+term;
+}
+const voyelle = s => /^[aeiouyéèêâîôûh]/i.test(s);
+
+/* --- verbes irréguliers ou à modification de radical --- */
+const IRR = [
+ {i:'être',e:'ser / estar',x:'a',pp:'été',f:'ser',p:['suis','es','est','sommes','êtes','sont'],
+  s:['sois','sois','soit','soyons','soyez','soient'],m:'ét',im:['sois','soyons','soyez'],
+  tcf:'« Il est essentiel que je sois… » — subjonctif totalement irrégulier, à connaître par cœur.'},
+ {i:'avoir',e:'haber / tener',x:'a',pp:'eu',f:'aur',p:['ai','as','a','avons','avez','ont'],
+  s:['aie','aies','ait','ayons','ayez','aient'],im:['aie','ayons','ayez'],
+  tcf:'Attention : « j\'ai 30 ans », jamais « je suis 30 ans ».'},
+ {i:'aller',e:'ir',x:'e',pp:'allé',f:'ir',p:['vais','vas','va','allons','allez','vont'],
+  s:['aille','ailles','aille','allions','alliez','aillent'],im:['va','allons','allez'],
+  tcf:'Auxiliaire être : « je suis allé(e) ». Futur proche : « je vais partir ».'},
+ {i:'faire',e:'hacer',x:'a',pp:'fait',f:'fer',p:['fais','fais','fait','faisons','faites','font'],
+  s:['fasse','fasses','fasse','fassions','fassiez','fassent'],
+  tcf:'« realizar un viaje » = **faire** un voyage, pas « réaliser ».'},
+ {i:'pouvoir',e:'poder',x:'a',pp:'pu',f:'pourr',p:['peux','peux','peut','pouvons','pouvez','peuvent'],
+  s:['puisse','puisses','puisse','puissions','puissiez','puissent'],
+  tcf:'« Pourriez-vous… » : le conditionnel est la formule de politesse attendue en tâche 1.'},
+ {i:'vouloir',e:'querer',x:'a',pp:'voulu',f:'voudr',p:['veux','veux','veut','voulons','voulez','veulent'],
+  s:['veuille','veuilles','veuille','voulions','vouliez','veuillent'],im:['veuille','veuillons','veuillez'],
+  tcf:'« Je voudrais… » ouvre poliment une demande ; « veuillez agréer » ferme une lettre formelle.'},
+ {i:'devoir',e:'deber',x:'a',pp:'dû',f:'devr',p:['dois','dois','doit','devons','devez','doivent'],
+  s:['doive','doives','doive','devions','deviez','doivent'],
+  tcf:'« Les autorités devraient… » : conditionnel = suggestion nuancée, très B2 en tâche 3.'},
+ {i:'savoir',e:'saber',x:'a',pp:'su',f:'saur',p:['sais','sais','sait','savons','savez','savent'],
+  s:['sache','saches','sache','sachions','sachiez','sachent'],im:['sache','sachons','sachez'],
+  tcf:'savoir = compétence ; connaître = familiarité avec une personne ou un lieu.'},
+ {i:'voir',e:'ver',x:'a',pp:'vu',f:'verr',p:['vois','vois','voit','voyons','voyez','voient'],
+  s:['voie','voies','voie','voyions','voyiez','voient']},
+ {i:'venir',e:'venir',x:'e',pp:'venu',f:'viendr',p:['viens','viens','vient','venons','venez','viennent'],
+  s:['vienne','viennes','vienne','venions','veniez','viennent'],
+  tcf:'« je viens de + infinitif » = passé récent, très utile en tâche 2.'},
+ {i:'tenir',e:'tener / sostener',x:'a',pp:'tenu',f:'tiendr',p:['tiens','tiens','tient','tenons','tenez','tiennent'],
+  s:['tienne','tiennes','tienne','tenions','teniez','tiennent'],
+  tcf:'« tenir à » = insister sur : « je tiens à vous remercier ».'},
+ {i:'prendre',e:'tomar / coger',x:'a',pp:'pris',f:'prendr',p:['prends','prends','prend','prenons','prenez','prennent'],
+  s:['prenne','prennes','prenne','prenions','preniez','prennent'],
+  tcf:'Même modèle : apprendre, comprendre, surprendre.'},
+ {i:'comprendre',e:'comprender',x:'a',pp:'compris',f:'comprendr',p:['comprends','comprends','comprend','comprenons','comprenez','comprennent'],
+  s:['comprenne','comprennes','comprenne','comprenions','compreniez','comprennent']},
+ {i:'apprendre',e:'aprender',x:'a',pp:'appris',f:'apprendr',p:['apprends','apprends','apprend','apprenons','apprenez','apprennent'],
+  s:['apprenne','apprennes','apprenne','apprenions','appreniez','apprennent'],
+  tcf:'apprendre **à** faire quelque chose ; apprendre quelque chose **à** quelqu\'un.'},
+ {i:'dire',e:'decir',x:'a',pp:'dit',f:'dir',p:['dis','dis','dit','disons','dites','disent'],
+  s:['dise','dises','dise','disions','disiez','disent'],
+  tcf:'« vous dites », pas « vous disez ». Une des trois formes en -tes avec être et faire.'},
+ {i:'mettre',e:'poner',x:'a',pp:'mis',f:'mettr',p:['mets','mets','met','mettons','mettez','mettent'],
+  s:['mette','mettes','mette','mettions','mettiez','mettent'],
+  tcf:'Même modèle : permettre, promettre, remettre, admettre.'},
+ {i:'falloir',e:'hacer falta / haber que',x:'a',pp:'fallu',f:'faudr',m:'fall',p:['—','—','faut','—','—','—'],
+  s:['—','—','faille','—','—','—'],imp:true,
+  tcf:'« il faut que » + **subjonctif** : il faut que je sois, que j\'aie, que je fasse. Erreur classique de l\'espagnol.'},
+ {i:'croire',e:'creer',x:'a',pp:'cru',f:'croir',p:['crois','crois','croit','croyons','croyez','croient'],
+  s:['croie','croies','croie','croyions','croyiez','croient'],
+  tcf:'Affirmatif : « je crois que c\'est » (indicatif). Négatif : « je ne crois pas que ce soit » (subjonctif).'},
+ {i:'connaître',e:'conocer',x:'a',pp:'connu',f:'connaîtr',p:['connais','connais','connaît','connaissons','connaissez','connaissent'],
+  s:['connaisse','connaisses','connaisse','connaissions','connaissiez','connaissent']},
+ {i:'écrire',e:'escribir',x:'a',pp:'écrit',f:'écrir',p:['écris','écris','écrit','écrivons','écrivez','écrivent'],
+  s:['écrive','écrives','écrive','écrivions','écriviez','écrivent'],
+  tcf:'« Je vous écris pour… » : la formule d\'ouverture la plus sûre en tâche 1.'},
+ {i:'lire',e:'leer',x:'a',pp:'lu',f:'lir',p:['lis','lis','lit','lisons','lisez','lisent'],
+  s:['lise','lises','lise','lisions','lisiez','lisent']},
+ {i:'partir',e:'irse / salir',x:'e',pp:'parti',f:'partir',p:['pars','pars','part','partons','partez','partent'],
+  s:['parte','partes','parte','partions','partiez','partent'],
+  tcf:'Auxiliaire être : « elle est partie » — le participe s\'accorde.'},
+ {i:'sortir',e:'salir',x:'e',pp:'sorti',f:'sortir',p:['sors','sors','sort','sortons','sortez','sortent'],
+  s:['sorte','sortes','sorte','sortions','sortiez','sortent'],
+  tcf:'Faux ami : « salir » en français veut dire rendre sale.'},
+ {i:'dormir',e:'dormir',x:'a',pp:'dormi',f:'dormir',p:['dors','dors','dort','dormons','dormez','dorment'],
+  s:['dorme','dormes','dorme','dormions','dormiez','dorment']},
+ {i:'recevoir',e:'recibir',x:'a',pp:'reçu',f:'recevr',p:['reçois','reçois','reçoit','recevons','recevez','reçoivent'],
+  s:['reçoive','reçoives','reçoive','recevions','receviez','reçoivent'],
+  tcf:'La cédille disparaît devant e et i : nous recevons, mais je reçois.'},
+ {i:'boire',e:'beber',x:'a',pp:'bu',f:'boir',p:['bois','bois','boit','buvons','buvez','boivent'],
+  s:['boive','boives','boive','buvions','buviez','boivent']},
+ {i:'vivre',e:'vivir',x:'a',pp:'vécu',f:'vivr',p:['vis','vis','vit','vivons','vivez','vivent'],
+  s:['vive','vives','vive','vivions','viviez','vivent'],
+  tcf:'Participe irrégulier : vécu. « J\'ai vécu à Montréal pendant deux ans. »'},
+ {i:'suivre',e:'seguir',x:'a',pp:'suivi',f:'suivr',p:['suis','suis','suit','suivons','suivez','suivent'],
+  s:['suive','suives','suive','suivions','suiviez','suivent'],
+  tcf:'« je suis » est ambigu : être ou suivre. Le contexte tranche.'},
+ {i:'ouvrir',e:'abrir',x:'a',pp:'ouvert',f:'ouvrir',p:['ouvre','ouvres','ouvre','ouvrons','ouvrez','ouvrent'],
+  s:['ouvre','ouvres','ouvre','ouvrions','ouvriez','ouvrent'],
+  tcf:'Présent en -er malgré l\'infinitif en -ir. Participe : ouvert.'},
+ {i:'offrir',e:'ofrecer / regalar',x:'a',pp:'offert',f:'offrir',p:['offre','offres','offre','offrons','offrez','offrent'],
+  s:['offre','offres','offre','offrions','offriez','offrent']},
+ {i:'courir',e:'correr',x:'a',pp:'couru',f:'courr',p:['cours','cours','court','courons','courez','courent'],
+  s:['coure','coures','coure','courions','couriez','courent']},
+ {i:'mourir',e:'morir',x:'e',pp:'mort',f:'mourr',p:['meurs','meurs','meurt','mourons','mourez','meurent'],
+  s:['meure','meures','meure','mourions','mouriez','meurent']},
+ {i:'naître',e:'nacer',x:'e',pp:'né',f:'naîtr',p:['nais','nais','naît','naissons','naissez','naissent'],
+  s:['naisse','naisses','naisse','naissions','naissiez','naissent']},
+ {i:'conduire',e:'conducir',x:'a',pp:'conduit',f:'conduir',p:['conduis','conduis','conduit','conduisons','conduisez','conduisent'],
+  s:['conduise','conduises','conduise','conduisions','conduisiez','conduisent'],
+  tcf:'Même modèle : produire, réduire, construire, traduire, introduire.'},
+ {i:'produire',e:'producir',x:'a',pp:'produit',f:'produir',p:['produis','produis','produit','produisons','produisez','produisent'],
+  s:['produise','produises','produise','produisions','produisiez','produisent']},
+ {i:'réduire',e:'reducir',x:'a',pp:'réduit',f:'réduir',p:['réduis','réduis','réduit','réduisons','réduisez','réduisent'],
+  s:['réduise','réduises','réduise','réduisions','réduisiez','réduisent'],
+  tcf:'« réduire les émissions », « réduire la consommation » : lexique de la tâche 3.'},
+ {i:'craindre',e:'temer',x:'a',pp:'craint',f:'craindr',p:['crains','crains','craint','craignons','craignez','craignent'],
+  s:['craigne','craignes','craigne','craignions','craigniez','craignent']},
+ {i:'valoir',e:'valer',x:'a',pp:'valu',f:'vaudr',p:['vaux','vaux','vaut','valons','valez','valent'],
+  s:['vaille','vailles','vaille','valions','valiez','vaillent'],
+  tcf:'« il vaudrait mieux que » + subjonctif : formule de recommandation très valorisée.'},
+ {i:'plaire',e:'gustar',x:'a',pp:'plu',f:'plair',p:['plais','plais','plaît','plaisons','plaisez','plaisent'],
+  s:['plaise','plaises','plaise','plaisions','plaisiez','plaisent']},
+ {i:'envoyer',e:'enviar',x:'a',pp:'envoyé',f:'enverr',p:['envoie','envoies','envoie','envoyons','envoyez','envoient'],
+  s:['envoie','envoies','envoie','envoyions','envoyiez','envoient'],
+  tcf:'Futur irrégulier : j\'enverrai. Même famille : renvoyer.'},
+ {i:'appeler',e:'llamar',x:'a',pp:'appelé',f:'appeller',p:['appelle','appelles','appelle','appelons','appelez','appellent'],
+  s:['appelle','appelles','appelle','appelions','appeliez','appellent'],
+  tcf:'Double L quand la terminaison est muette : j\'appelle, mais nous appelons.'},
+ {i:'acheter',e:'comprar',x:'a',pp:'acheté',f:'achèter',p:['achète','achètes','achète','achetons','achetez','achètent'],
+  s:['achète','achètes','achète','achetions','achetiez','achètent']},
+ {i:'préférer',e:'preferir',x:'a',pp:'préféré',f:'préférer',p:['préfère','préfères','préfère','préférons','préférez','préfèrent'],
+  s:['préfère','préfères','préfère','préférions','préfériez','préfèrent'],
+  tcf:'Accent grave devant syllabe muette : je préfère, nous préférons.'},
+ {i:'espérer',e:'esperar (tener esperanza)',x:'a',pp:'espéré',f:'espérer',p:['espère','espères','espère','espérons','espérez','espèrent'],
+  s:['espère','espères','espère','espérions','espériez','espèrent'],
+  tcf:'« J\'espère que » + **indicatif futur** : j\'espère que vous pourrez venir.'},
+ {i:'commencer',e:'empezar',x:'a',pp:'commencé',f:'commencer',p:['commence','commences','commence','commençons','commencez','commencent'],
+  s:['commence','commences','commence','commencions','commenciez','commencent'],
+  tcf:'Cédille devant a et o : nous commençons, je commençais.'},
+ {i:'manger',e:'comer',x:'a',pp:'mangé',f:'manger',p:['mange','manges','mange','mangeons','mangez','mangent'],
+  s:['mange','manges','mange','mangions','mangiez','mangent'],
+  tcf:'E de liaison devant a et o : nous mangeons, je mangeais. Idem voyager, partager, encourager.'},
+ {i:'payer',e:'pagar',x:'a',pp:'payé',f:'paier',p:['paie','paies','paie','payons','payez','paient'],
+  s:['paie','paies','paie','payions','payiez','paient']},
+ {i:'essayer',e:'intentar / probar',x:'a',pp:'essayé',f:'essaier',p:['essaie','essaies','essaie','essayons','essayez','essaient'],
+  s:['essaie','essaies','essaie','essayions','essayiez','essaient'],
+  tcf:'essayer **de** + infinitif. En espagnol l\'infinitif est nu : c\'est un piège fréquent.'},
+ {i:'se lever',e:'levantarse',x:'e',pp:'levé',f:'lèver',p:['lève','lèves','lève','levons','levez','lèvent'],
+  s:['lève','lèves','lève','levions','leviez','lèvent'],pron:true},
+ {i:'s\'inscrire',e:'inscribirse',x:'e',pp:'inscrit',f:'inscrir',p:['inscris','inscris','inscrit','inscrivons','inscrivez','inscrivent'],
+  s:['inscrive','inscrives','inscrive','inscrivions','inscriviez','inscrivent'],pron:true,
+  tcf:'« Je me suis inscrit à un cours » : auxiliaire être, accord avec le sujet.'},
+ {i:'se souvenir',e:'acordarse',x:'e',pp:'souvenu',f:'souviendr',p:['souviens','souviens','souvient','souvenons','souvenez','souviennent'],
+  s:['souvienne','souviennes','souvienne','souvenions','souveniez','souviennent'],pron:true,
+  tcf:'se souvenir **de** quelque chose ; se rappeler quelque chose, sans préposition.'}
+];
+
+/* --- verbes réguliers --- */
+const REG = [
+ ['parler','hablar','er','a'],['aimer','gustar / amar','er','a'],['penser','pensar','er','a'],
+ ['trouver','encontrar','er','a'],['donner','dar','er','a'],['demander','pedir','er','a'],
+ ['travailler','trabajar','er','a'],['étudier','estudiar','er','a'],['habiter','vivir (residir)','er','a'],
+ ['écouter','escuchar','er','a'],['regarder','mirar','er','a'],['chercher','buscar','er','a'],
+ ['arriver','llegar','er','e'],['rester','quedarse','er','e'],['passer','pasar','er','a'],
+ ['aider','ayudar','er','a'],['expliquer','explicar','er','a'],['proposer','proponer','er','a'],
+ ['participer','participar','er','a'],['améliorer','mejorar','er','a'],['développer','desarrollar','er','a'],
+ ['augmenter','aumentar','er','a'],['diminuer','disminuir','er','a'],['utiliser','utilizar','er','a'],
+ ['créer','crear','er','a'],['éviter','evitar','er','a'],['favoriser','favorecer','er','a'],
+ ['organiser','organizar','er','a'],['présenter','presentar','er','a'],['apporter','aportar','er','a'],
+ ['montrer','mostrar','er','a'],['souhaiter','desear','er','a'],['remercier','agradecer','er','a'],
+ ['informer','informar','er','a'],['décider','decidir','er','a'],['oublier','olvidar','er','a'],
+ ['accepter','aceptar','er','a'],['refuser','rechazar','er','a'],['profiter','aprovechar','er','a'],
+ ['consacrer','dedicar','er','a'],['signaler','señalar','er','a'],['constater','constatar','er','a'],
+ ['finir','terminar','ir','a'],['choisir','elegir','ir','a'],['réussir','lograr / aprobar','ir','a'],
+ ['réfléchir','reflexionar','ir','a'],['remplir','rellenar','ir','a'],['agir','actuar','ir','a'],
+ ['établir','establecer','ir','a'],['grandir','crecer','ir','a'],['définir','definir','ir','a'],
+ ['investir','invertir','ir','a'],['avertir','avisar','ir','a'],['enrichir','enriquecer','ir','a'],
+ ['attendre','esperar (aguardar)','re','a'],['entendre','oír','re','a'],['répondre','responder','re','a'],
+ ['perdre','perder','re','a'],['vendre','vender','re','a'],['rendre','devolver','re','a'],
+ ['descendre','bajar','re','e'],['défendre','defender','re','a']
+];
+
+const NOTES_REG = {
+  'attendre':'Faux ami : « atender » espagnol = s\'occuper de. « Attendre » = esperar.',
+  'entendre':'Faux ami : « entender » = comprendre. « Entendre » = oír.',
+  'rester':'Faux ami : « restar » = soustraire. « Rester » = quedarse. Auxiliaire être.',
+  'demander':'demander **à** quelqu\'un **de** faire quelque chose.',
+  'réussir':'réussir **à** + infinitif : « j\'ai réussi à obtenir le poste ».',
+  'décider':'décider **de** + infinitif. Sans « de », c\'est un calque de l\'espagnol.',
+  'aider':'aider quelqu\'un **à** faire quelque chose.',
+  'penser':'penser **à** quelque chose = y songer ; penser **de** = avoir une opinion.',
+  'profiter':'profiter **de** : « profiter de cette occasion pour… ».',
+  'arriver':'Auxiliaire être : « je suis arrivé(e) ». Aussi impersonnel : « il arrive que » + subjonctif.'
+};
+
+function construire(v){
+  const o = Object.assign({}, v);
+  if(!o.p){ // régulier
+    const rad = o.g==='re' ? o.i.slice(0,-2) : o.i.slice(0,-2);
+    if(o.g==='er'){ o.p=['e','es','e','ons','ez','ent'].map(t=>joindre(rad,t)); o.pp=rad+'é'; o.f=o.i; }
+    if(o.g==='ir'){ o.p=[rad+'is',rad+'is',rad+'it',rad+'issons',rad+'issez',rad+'issent']; o.pp=rad+'i'; o.f=o.i; }
+    if(o.g==='re'){ o.p=[rad+'s',rad+'s',rad,rad+'ons',rad+'ez',rad+'ent']; o.pp=rad+'u'; o.f=o.i.slice(0,-1); }
+  }
+  o.m = o.m || o.p[3].replace(/ons$/,'');
+  if(!o.s){
+    const r3 = o.p[5].replace(/ent$/,'');
+    o.s = [joindre(r3,'e'),joindre(r3,'es'),joindre(r3,'e'),joindre(o.m,'ions'),joindre(o.m,'iez'),joindre(r3,'ent')];
+  }
+  if(!o.im){
+    let tu = o.p[1];
+    if(/es$/.test(tu) && (o.g==='er'||/^(ouvrir|offrir|souffrir|couvrir)$/.test(o.i)||/e$/.test(o.p[0]))) tu = tu.slice(0,-1);
+    o.im = [tu,o.p[3],o.p[4]];
+  }
+  o.nom = o.i;
+  o.rad_srch = (o.i+' '+o.e).toLowerCase();
+  return o;
+}
+
+const VERBES = IRR.map(construire).concat(REG.map(r=>construire({i:r[0],e:r[1],g:r[2],x:r[3],tcf:NOTES_REG[r[0]]})))
+  .sort((a,b)=>a.i.localeCompare(b.i,'fr'));
+const ETRE = VERBES.find(v=>v.i==='être'), AVOIR = VERBES.find(v=>v.i==='avoir');
+
+function refl(v,k,suivant){
+  if(!v.pron) return '';
+  const r = REFL[k];
+  return (voyelle(suivant) && (r==='me'||r==='te'||r==='se')) ? r[0]+"'" : r+' ';
+}
+function sujet(k,forme){
+  if(k===0) return voyelle(forme) ? "j'" : 'je ';
+  return PRON_SUJ[k]+' ';
+}
+function ppAcc(v,k){
+  if(v.x!=='e') return v.pp;
+  return (k===3||k===4||k===5) ? v.pp+'(e)s' : v.pp+'(e)';
+}
+function aux(v,temps,k){
+  const a = v.x==='e' ? ETRE : AVOIR;
+  return temps==='pres' ? a.p[k] : joindre(a.m, F_IMP[k]);
+}
+
+function formes(v){
+  const F = {'présent':[],'passé composé':[],'imparfait':[],'plus-que-parfait':[],
+             'futur simple':[],'conditionnel présent':[],'subjonctif présent':[]};
+  const mettre = (t,k,noyau)=>{ F[t].push(refl(v,k,noyau)+noyau); };
+  for(let k=0;k<6;k++){
+    if(v.imp && k!==2){ Object.keys(F).forEach(t=>F[t].push('—')); continue; }
+    mettre('présent',k,v.p[k]);
+    mettre('passé composé',k,aux(v,'pres',k)+' '+ppAcc(v,k));
+    mettre('imparfait',k,joindre(v.m,F_IMP[k]));
+    mettre('plus-que-parfait',k,aux(v,'imp',k)+' '+ppAcc(v,k));
+    mettre('futur simple',k,v.f+F_FUT[k]);
+    mettre('conditionnel présent',k,v.f+F_IMP[k]);
+    mettre('subjonctif présent',k,v.s[k]);
+  }
+  return F;
+}
+
+const AVEC_SUJET = {
+  'présent':(v,k,f)=>v.imp?(k===2?'il '+f:'—'):sujet(k,f)+f,
+  'passé composé':(v,k,f)=>v.imp?(k===2?'il a fallu':'—'):sujet(k,f)+f,
+  'imparfait':(v,k,f)=>v.imp?(k===2?'il '+f:'—'):sujet(k,f)+f,
+  'plus-que-parfait':(v,k,f)=>v.imp?(k===2?'il avait fallu':'—'):sujet(k,f)+f,
+  'futur simple':(v,k,f)=>v.imp?(k===2?'il '+f:'—'):sujet(k,f)+f,
+  'conditionnel présent':(v,k,f)=>v.imp?(k===2?'il '+f:'—'):sujet(k,f)+f,
+  'subjonctif présent':(v,k,f)=>{
+    if(f==='—') return '—';
+    if(v.imp) return "qu'il "+f;
+    const q = (k===2||k===5) ? "qu'" : 'que ';
+    return q + (k===0 ? (voyelle(f)?"j'":'je ') : PRON_SUJ[k]+' ') + f;
+  }
+};
+
+/* ============================================================
+   6. INTERFACE CONJUGAISON
+   ============================================================ */
+let verbeActif = VERBES.find(v=>v.i==='être');
+let filtreActif = 'tous';
+const FILTRES = [['tous','Tous'],['irr','Irréguliers'],['er','1er groupe'],['ir','2e groupe'],['re','3e -re'],['pron','Pronominaux']];
+
+function listeVerbes(){
+  const q = $('#rech-verbe').value.trim().toLowerCase();
+  const sel = VERBES.filter(v=>{
+    if(q && !v.rad_srch.includes(q)) return false;
+    if(filtreActif==='irr') return !v.g;
+    if(filtreActif==='er') return v.g==='er';
+    if(filtreActif==='ir') return v.g==='ir';
+    if(filtreActif==='re') return v.g==='re';
+    if(filtreActif==='pron') return !!v.pron;
+    return true;
+  });
+  $('#cpt-verbes').textContent = sel.length+' / '+VERBES.length;
+  $('#liste-verbes').innerHTML = sel.map(v=>
+    '<button class="verbe-item" data-v="'+esc(v.i)+'" aria-current="'+(v.i===verbeActif.i)+'"><span>'+esc(v.i)+'</span><span class="gl">'+esc(v.e)+'</span></button>').join('')
+    || '<p style="padding:12px;color:var(--encre-3);font-size:13px">Aucun verbe ne correspond.</p>';
+  $('#liste-verbes').querySelectorAll('.verbe-item').forEach(b=>b.addEventListener('click',()=>{
+    verbeActif = VERBES.find(v=>v.i===b.dataset.v); listeVerbes(); fiche();
+  }));
+}
+
+function fiche(){
+  const v = verbeActif, F = formes(v);
+  const groupe = v.g==='er'?'1er groupe':v.g==='ir'?'2e groupe':v.g==='re'?'3e groupe (-re)':'irrégulier';
+  const blocs = Object.keys(F).map(t=>{
+    const rappel = t==='subjonctif présent'?'que…':t==='conditionnel présent'?'politesse / hypothèse':
+                   t==='plus-que-parfait'?'antériorité':t==='imparfait'?'décor, habitude':
+                   t==='passé composé'?'action achevée':t==='futur simple'?'projection':'';
+    return '<div class="temps"><h4>'+t+'<em>'+rappel+'</em></h4><table>'+
+      F[t].map((f,k)=>'<tr><td class="p">'+PRON[k].split(' / ')[0]+'</td><td class="f">'+esc(AVEC_SUJET[t](v,k,f))+'</td></tr>').join('')+
+      '</table></div>';
+  }).join('');
+  const imp = v.imp ? '' : '<div class="temps"><h4>impératif<em>ordre, conseil</em></h4><table>'+
+    ['tu','nous','vous'].map((p,k)=>'<tr><td class="p">'+p+'</td><td class="f">'+esc(v.im[k]+(v.pron?'-'+['toi','nous','vous'][k]:''))+'</td></tr>').join('')+'</table></div>';
+
+  $('#fiche').innerHTML =
+    '<div class="fiche-verbe"><h3>'+esc(v.i)+'</h3><div class="meta">'+
+      '<span class="puce">'+groupe+'</span>'+
+      '<span class="puce">auxiliaire '+(v.x==='e'?'être':'avoir')+'</span>'+
+      '<span class="puce '+(v.g?'':'acc')+'">participe : '+esc(v.pp)+'</span>'+
+      (v.pron?'<span class="puce acc">pronominal</span>':'')+
+      '<span class="puce es">'+esc(v.e)+'</span>'+
+    '</div></div>'+
+    '<div class="tableau-temps">'+blocs+imp+'</div>'+
+    (v.tcf?'<p class="note-tcf">'+grasClair(v.tcf)+'</p>':'')+
+    '<div style="padding:0 22px 18px"><button class="bouton" id="btn-cibler">S\'entraîner sur ce verbe</button></div>';
+
+  $('#btn-cibler').addEventListener('click',()=>{
+    modeExo='cible';
+    document.querySelectorAll('.exo-tete').forEach(x=>x.setAttribute('aria-pressed',x.dataset.mode==='cible'));
+    nouvelExo(); $('#exo-corps').scrollIntoView({behavior:'smooth',block:'center'});
+  });
+}
+
+$('#filtres-verbes').innerHTML = FILTRES.map(f=>'<button class="filtre" data-f="'+f[0]+'" aria-pressed="'+(f[0]===filtreActif)+'">'+f[1]+'</button>').join('');
+$('#filtres-verbes').querySelectorAll('.filtre').forEach(b=>b.addEventListener('click',()=>{
+  filtreActif=b.dataset.f;
+  $('#filtres-verbes').querySelectorAll('.filtre').forEach(x=>x.setAttribute('aria-pressed',x.dataset.f===filtreActif));
+  listeVerbes();
+}));
+$('#rech-verbe').addEventListener('input',listeVerbes);
+
+/* ============================================================
+   7. EXERCICES AUTO-CORRIGÉS
+   ============================================================ */
+const TEMPS_EXO = ['présent','passé composé','imparfait','plus-que-parfait','futur simple',
+                   'conditionnel présent','subjonctif présent'];
+const POIDS = {'présent':1,'passé composé':2,'imparfait':2,'plus-que-parfait':2,
+               'futur simple':2,'conditionnel présent':3,'subjonctif présent':4};
+const TIRAGE = [];
+TEMPS_EXO.forEach(t=>{ for(let n=0;n<POIDS[t];n++) TIRAGE.push(t); });
+
+const RAPPELS = {
+ 'présent':'Vérifiez le radical : il change souvent au pluriel (je peux / nous pouvons).',
+ 'passé composé':'Auxiliaire au présent + participe passé. Avec être, le participe s\'accorde avec le sujet.',
+ 'imparfait':'Radical du « nous » au présent + -ais, -ais, -ait, -ions, -iez, -aient. Une seule exception : être → ét-.',
+ 'plus-que-parfait':'Auxiliaire à l\'imparfait + participe passé. Il marque l\'antériorité dans un récit.',
+ 'futur simple':'Radical du futur + -ai, -as, -a, -ons, -ez, -ont. Le radical se termine toujours par -r.',
+ 'conditionnel présent':'Radical du futur + terminaisons de l\'imparfait. C\'est le temps de la politesse et de l\'hypothèse.',
+ 'subjonctif présent':'Radical du « ils » au présent + -e, -es, -e, -ent ; « nous » et « vous » reprennent l\'imparfait.'
+};
+
+const TOP = ['être','avoir','aller','faire','pouvoir','vouloir','devoir','savoir','voir','venir','prendre',
+ 'dire','mettre','croire','connaître','écrire','lire','partir','recevoir','vivre','suivre','ouvrir','tenir',
+ 'falloir','valoir','envoyer','appeler','acheter','préférer','espérer','commencer','manger','essayer',
+ 'parler','penser','demander','choisir','finir','réussir','réfléchir','attendre','répondre','rendre',
+ 'comprendre','apprendre','réduire','améliorer','participer','décider','s\'inscrire','se souvenir','se lever'];
+
+const PHRASES = [
+ {ph:'Il faudrait que la municipalité ___ davantage dans les transports en commun.',v:'investir',t:'subjonctif présent',k:2,why:'« il faut / il faudrait que » impose toujours le subjonctif.'},
+ {ph:'Bien que le télétravail ___ de nombreux avantages, il isole certains salariés.',v:'avoir',t:'subjonctif présent',k:2,why:'« bien que » est suivi du subjonctif : la concession la plus rentable en tâche 3.'},
+ {ph:'Je vous écris afin que vous ___ prendre une décision rapidement.',v:'pouvoir',t:'subjonctif présent',k:4,why:'« afin que » et « pour que » demandent le subjonctif ; « afin de » + infinitif si le sujet est le même.'},
+ {ph:'Si j\'avais plus de temps, je ___ davantage à ce projet.',v:'consacrer',t:'conditionnel présent',k:0,why:'Si + imparfait dans la subordonnée, conditionnel présent dans la principale.'},
+ {ph:'Quand je suis arrivé, la réunion ___ depuis vingt minutes.',v:'commencer',t:'plus-que-parfait',k:2,why:'Le plus-que-parfait marque ce qui précède un autre passé.'},
+ {ph:'L\'an dernier, nous ___ chaque semaine aux ateliers du quartier.',v:'participer',t:'imparfait',k:3,why:'Habitude dans le passé : imparfait.'},
+ {ph:'J\'___ que vous accepterez ma proposition.',v:'espérer',t:'présent',k:0,why:'« espérer que » est suivi de l\'indicatif, pas du subjonctif — contrairement à « esperar que » en espagnol.'},
+ {ph:'Il est possible que cette mesure ___ efficace à long terme.',v:'être',t:'subjonctif présent',k:2,why:'« il est possible que » exprime le doute : subjonctif.'},
+ {ph:'D\'ici dix ans, la ville ___ ses émissions de moitié.',v:'réduire',t:'futur simple',k:2,why:'Projection chiffrée : futur simple.'},
+ {ph:'Vous ___ mieux de consulter un conseiller avant de signer.',v:'faire',t:'conditionnel présent',k:4,why:'« vous feriez mieux de » : conseil poli, très apprécié au niveau B2.'},
+ {ph:'Il ___ mieux que nous en discutions de vive voix.',v:'valoir',t:'conditionnel présent',k:2,why:'« il vaudrait mieux que » + subjonctif dans la suite.'},
+ {ph:'Avant mon arrivée, je ne ___ personne dans cette ville.',v:'connaître',t:'imparfait',k:0,why:'État qui dure dans le passé : imparfait.'},
+ {ph:'Nous ___ ravis de vous accueillir la semaine prochaine.',v:'être',t:'futur simple',k:3,why:'Formule de clôture courante en tâche 1.'},
+ {ph:'Je ne crois pas qu\'un tel projet ___ aboutir sans financement.',v:'pouvoir',t:'subjonctif présent',k:2,why:'« croire » à la forme négative bascule au subjonctif.'},
+ {ph:'Elle ___ à Montréal depuis cinq ans.',v:'vivre',t:'présent',k:2,why:'« depuis » + présent quand l\'action dure encore.'},
+ {ph:'Hier, les riverains ___ une pétition à la mairie.',v:'envoyer',t:'passé composé',k:5,why:'Action ponctuelle achevée : passé composé.'},
+ {ph:'Il faut que je ___ mon dossier d\'inscription avant vendredi.',v:'finir',t:'subjonctif présent',k:0,why:'Subjonctif des verbes du 2e groupe : radical en -iss-.'},
+ {ph:'Nous ___ de terminer le rapport quand la panne est survenue.',v:'venir',t:'imparfait',k:3,why:'« venir de » à l\'imparfait = passé récent dans un récit.'},
+ {ph:'Si rien ne change, les habitants ___ à manifester.',v:'commencer',t:'futur simple',k:5,why:'Si + présent, futur dans la principale.'},
+ {ph:'Autrefois, les gens ___ le journal tous les matins.',v:'lire',t:'imparfait',k:5,why:'Habitude révolue : imparfait.'},
+ {ph:'Je vous ___ de bien vouloir m\'excuser pour ce contretemps.',v:'demander',t:'présent',k:0,why:'Registre formel : « je vous demande de bien vouloir… »'},
+ {ph:'Après avoir longuement hésité, elle ___ de déménager.',v:'décider',t:'passé composé',k:2,why:'décider **de** + infinitif : la préposition est obligatoire.'},
+ {ph:'À condition que vous ___ à l\'heure, nous pourrons commencer.',v:'arriver',t:'subjonctif présent',k:4,why:'« à condition que » impose le subjonctif.'},
+ {ph:'Ce matin-là, je ___ à cinq heures pour préparer l\'entretien.',v:'se lever',t:'passé composé',k:0,why:'Verbe pronominal : auxiliaire être et pronom réfléchi obligatoire.'},
+ {ph:'Les autorités ___ de nouvelles mesures dès l\'an prochain.',v:'prendre',t:'futur simple',k:5,why:'Futur simple pour une décision annoncée.'},
+ {ph:'Jusqu\'à ce que vous ___ une réponse écrite, patientez.',v:'recevoir',t:'subjonctif présent',k:4,why:'« jusqu\'à ce que » est toujours suivi du subjonctif.'}
+];
+
+let modeExo = 'flash', exo = null;
+let stat = {n:0, ok:0, serie:0, meilleure:0, accent:0};
+
+const nettoie = s => s.toLowerCase().replace(/[’]/g,"'").replace(/\((?:e|s|es)\)/g,'')
+  .replace(/\s+/g,' ').trim().replace(/^(?:qu'|que |j'|je |tu |il |elle |on |nous |vous |ils |elles )+/,'').trim();
+const sansAcc = s => nettoie(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ç/g,'c');
+
+function tirer(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+function nouvelExo(){
+  if(modeExo==='phrases'){
+    const p = tirer(PHRASES), v = VERBES.find(x=>x.i===p.v);
+    exo = {type:'phrase', v:v, t:p.t, k:p.k, rep:formes(v)[p.t][p.k], why:p.why, ph:p.ph};
+  }else{
+    const v = modeExo==='cible' ? verbeActif : VERBES.find(x=>x.i===tirer(TOP));
+    let k = Math.floor(Math.random()*6);
+    if(v.imp) k = 2;
+    const t = tirer(TIRAGE);
+    exo = {type:'flash', v:v, t:t, k:k, rep:formes(v)[t][k], why:RAPPELS[t]};
+  }
+  rendreExo();
+}
+
+function rendreExo(){
+  const v = exo.v;
+  const suj = v.imp ? 'il' : PRON_SUJ[exo.k];
+  const espace = (exo.t==='subjonctif présent' && (exo.k===2||exo.k===5||v.imp)) ? '' : ' ';
+  const corps = exo.type==='phrase'
+    ? '<p class="question">'+esc(exo.ph).replace('___','<span class="trou"></span>')+'</p>'+
+      '<p class="consigne-exo">'+esc(v.i)+' · '+esc(exo.t)+' · '+PRON[exo.k]+'</p>'
+    : '<p class="question">'+(exo.t==='subjonctif présent'?((exo.k===2||exo.k===5||v.imp)?"qu'":'que '):'')+esc(suj)+' <span class="trou"></span> <span class="inf">('+esc(v.i)+')</span></p>'+
+      '<p class="consigne-exo">'+esc(exo.t)+' · '+esc(v.e)+'</p>';
+
+  $('#exo-corps').innerHTML = corps +
+    '<div class="rangee-reponse"><input id="reponse-exo" autocomplete="off" spellcheck="false" placeholder="Écrivez la forme conjuguée…">'+
+    '<button class="bouton clair" id="btn-verif">Vérifier</button>'+
+    '<button class="bouton clair" id="btn-suivant">Suivant</button></div>'+
+    '<div class="verdict" id="verdict"></div>';
+
+  $('#btn-verif').addEventListener('click',verifier);
+  $('#btn-suivant').addEventListener('click',nouvelExo);
+  const inp = $('#reponse-exo');
+  inp.addEventListener('keydown',e=>{
+    if(e.key!=='Enter') return;
+    if($('#verdict').classList.contains('visible')) nouvelExo(); else verifier();
+  });
+  inp.focus();
+  majStats();
+}
+
+function verifier(){
+  const inp = $('#reponse-exo'), v = $('#verdict');
+  const donne = inp.value, attendu = exo.rep;
+  if(!donne.trim()) return;
+  if(v.classList.contains('visible')) return;
+  stat.n++;
+
+  const juste = nettoie(donne)===nettoie(attendu);
+  const presque = !juste && sansAcc(donne)===sansAcc(attendu);
+  const complet = AVEC_SUJET[exo.t](exo.v, exo.k, attendu);
+
+  if(juste){
+    stat.ok++; stat.serie++; stat.meilleure = Math.max(stat.meilleure,stat.serie);
+    v.className='verdict juste visible';
+    v.innerHTML = '<b>'+esc(complet)+'</b> — exact.<span class="astuce">'+esc(exo.why||'')+'</span>';
+  }else if(presque){
+    stat.serie=0; stat.accent++;
+    v.className='verdict presque visible';
+    v.innerHTML = '<b>'+esc(complet)+'</b> — la forme est bonne, l\'accentuation ne l\'est pas.<span class="astuce">Au TCF, un accent manquant est compté comme une faute d\'orthographe. C\'est votre deuxième source d\'erreurs : relisez toujours une fois pour les seuls accents.</span>';
+  }else{
+    stat.serie=0;
+    v.className='verdict faux visible';
+    v.innerHTML = '<b>'+esc(complet)+'</b><span class="astuce">Vous avez écrit « '+esc(donne.trim())+' ». '+esc(exo.why||RAPPELS[exo.t]||'')+'</span>';
+  }
+  majStats();
+  $('#btn-suivant').focus();
+}
+
+function majStats(){
+  const taux = stat.n ? Math.round(stat.ok/stat.n*100) : 0;
+  $('#stats-exo').innerHTML =
+    '<div class="stat"><b>'+stat.ok+' / '+stat.n+'</b>formes justes</div>'+
+    '<div class="stat"><b>'+taux+' %</b>réussite</div>'+
+    '<div class="stat"><b>'+stat.serie+'</b>série en cours</div>'+
+    '<div class="stat"><b>'+stat.meilleure+'</b>meilleure série</div>'+
+    '<div class="stat"><b>'+stat.accent+'</b>fautes d\'accent seules</div>';
+  $('#serie').textContent = stat.n ? taux+' % · série '+stat.serie : '';
+}
+
+document.querySelectorAll('.exo-tete').forEach(b=>b.addEventListener('click',()=>{
+  modeExo = b.dataset.mode;
+  document.querySelectorAll('.exo-tete').forEach(x=>x.setAttribute('aria-pressed',x.dataset.mode===modeExo));
+  nouvelExo();
+}));
+
+listeVerbes(); fiche(); nouvelExo();
+
+</script>
+</body>
+</html>
