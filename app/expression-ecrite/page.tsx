@@ -6,6 +6,7 @@ import SelecteurTache from "@/components/expression-ecrite/SelecteurTache";
 import EditeurSeyes from "@/components/expression-ecrite/EditeurSeyes";
 import Chrono from "@/components/expression-ecrite/Chrono";
 import PanneauLive from "@/components/expression-ecrite/PanneauLive";
+import BaseConnaissanceSidebar from "@/components/expression-ecrite/BaseConnaissanceSidebar";
 import ResultatCorrection, {
   ResultatTropCourt,
   ResultatChargement,
@@ -48,6 +49,7 @@ function PageExpressionEcrite() {
 
   const [onglet, setOnglet] = useState<Onglet>("editeur");
   const [tacheActive, setTacheActive] = useState<1 | 2 | 3>(1);
+  const [kbOuvert, setKbOuvert] = useState<boolean>(false);
   const [copie, setCopie] = useState("");
   const [resultatMode, setResultatMode] = useState<ResultatMode>("vide");
   const [correctResult, setCorrectResult] = useState<CorrectionResult | null>(null);
@@ -85,6 +87,7 @@ function PageExpressionEcrite() {
 
   useEffect(() => {
     setOnglet(tabParam === "conjugaison" ? "conjugaison" : "editeur");
+    if (tabParam === "connaissance") setKbOuvert(true);
   }, [tabParam]);
 
   useEffect(() => {
@@ -457,6 +460,16 @@ function PageExpressionEcrite() {
               erreurs={erreurs}
               totalLive={totalLive}
               onInsertFormule={insererAuCurseur}
+            />
+            <BaseConnaissanceSidebar
+              tache={tacheActive}
+              ouvert={kbOuvert}
+              onToggle={() => setKbOuvert((o) => !o)}
+              className={
+                kbOuvert && tabParam === "connaissance"
+                  ? "lg:!fixed lg:!right-6 lg:!top-24 lg:!bottom-6 lg:!w-[480px] z-40 shadow-2xl"
+                  : ""
+              }
             />
             <section className="carte sombre codes">
               <div className="entete-carte">

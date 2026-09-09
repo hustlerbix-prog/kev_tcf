@@ -1,5 +1,138 @@
 import type { Tache } from "@/lib/types/tcf";
 
+export const CONNECTEURS_T3_GROUPE: Record<string, [string, string, string]> = {
+  "POUR COMPARER": ["En revanche", "À l'inverse", "Tandis que"],
+  "POUR AJOUTER": ["Tout d'abord", "De plus", "En outre"],
+  "POUR EXPLIQUER": ["En effet", "Car", "Parce que"],
+  "POUR DONNER UN EXEMPLE": ["Par exemple", "Notamment", "À savoir"],
+  "POUR NUANCER": ["Cependant", "Pourtant", "Néanmoins"],
+  "POUR CONCLURE": ["Pour conclure", "En somme", "Finalement"],
+};
+
+const _FLAT_CONNECTEURS_T3: string[] = Object.values(CONNECTEURS_T3_GROUPE).reduce(
+  (acc: string[], trio) => {
+    for (const c of trio) acc.push(c);
+    return acc;
+  },
+  [] as string[]
+);
+
+export function checklistOfficielleT1(
+  txt: string
+): [label: string, ok: boolean, aide: string][] {
+  const n = motsDe(txt);
+  const qqoqccp = /\b(qui|quoi|quand|où|avec qui|combien|pourquoi|comment|samedi|dimanche|janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|rue|avenue|bourg|québec|montréal|toronto|vancouver|ottawa)\b/i;
+  const compteQQOQCCP = (txt.match(qqoqccp) || []).length;
+  return [
+    [
+      "Destinataire",
+      /(^|\n)\s*(Salut\s+[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜÆŒ]|Bonjour\s+(Madame|Monsieur|Cher\s+[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜ]|Chère\s+[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜ]|Chers|Mesdames|Messieurs))/i.test(
+        txt
+      ),
+      "Salut [Prénom] / Bonjour Madame, Monsieur",
+    ],
+    [
+      "Motif",
+      /(je\s*t['’É]écri[st]|je\s+vous\s+écri[st]|je\s+me\s+permets?\s+de\s+(vous\s+)?écri[st]|je\s+vous\s+adresse)/i.test(
+        txt
+      ),
+      "Je t'écris pour… / Je vous écris afin de…",
+    ],
+    [
+      "2-3 détails concrets",
+      n >= 45 && compteQQOQCCP >= 3,
+      "Qui · Quoi · Quand · Où · Avec qui (≥3 mots-clés présents)",
+    ],
+    [
+      "Demande / attente",
+      /(j['’]aimerais|je\s+souhaiterais|pourrais-tu|pourriez-vous|je\s+te\s+demande|je\s+vous\s+demande|serait-il\s+possible|peux-tu|pouvez-vous|attends\s+de\s+(ta|votre)\s+part|dis-moi|réponds-moi)/i.test(
+        txt
+      ),
+      "J'aimerais que… / Pourriez-vous… / Dis-moi si…",
+    ],
+    [
+      "Formule de fin",
+      /(à\s+bientôt|porte-toi\s+bien|amicalement|cordialement|bien\s+à\s+(toi|vous)|salutations|au\s+plaisir|à\s+très\s+vite|je\s+t['’]embrasse|je\s+vous\s+remercie)/i.test(
+        txt
+      ),
+      "À bientôt · Cordialement · Amicalement · Prénom",
+    ],
+    [
+      "60-120 mots",
+      n >= 60 && n <= 120,
+      `Compte actuel : ${n} mots · cible 95-115`,
+    ],
+  ];
+}
+
+export function checklistOfficielleT3(
+  txt: string
+): [label: string, ok: boolean, aide: string][] {
+  const n = motsDe(txt);
+  const { a: part1, b: part2 } = couperT3(txt);
+  const n1 = motsDe(part1);
+  const n2 = motsDe(part2);
+  const argWords = /\b(Tout d'abord|De plus|En outre|En effet|Premièrement|Deuxièmement|Par ailleurs|D'une part|D'autre part)\b/i;
+  const argsPart2 = Array.from(part2.matchAll(argWords)).length;
+  const marqueursAvis = /\b(le\s+premier\s+document|le\s+second\s+document|premier\s+texte|deuxième\s+texte|certains[^.]{0,80}(par\s+contre|en\s+revanche|à\s+l['’]inverse)[^.]{0,120}d['’]autres)\b/i;
+  const deuxDocs = marqueursAvis.test(txt);
+  const exPart2 = /\b(Par\s+exemple|Notamment|À\s+savoir)\b/i.test(part2);
+  const conclPart2 = /\b(Pour\s+conclure|En\s+somme|Finalement|En\s+définitive|En\s+conclusion)\b/i.test(
+    part2
+  );
+  const prefixe = txt.slice(0, Math.min(80, txt.length));
+  const debutJePense =
+    /\b(pour\s+ma\s+part|je\s+pense|je\s+considère|à\s+mon\s+sujet|selon\s+moi|personnellement|il\s+me\s+semble|j['’]estime)\b/i;
+  const regleRoseOk =
+    !debutJePense.test(part1) && !/argument\s+personnel|copier[- ]coller|copié-collé/i.test(txt.slice(0, Math.max(150, n1 * 5)));
+  return [
+    [
+      "2 opinions reformulées",
+      deuxDocs ||
+        (/\b(Certains|Les\s+uns|Une\s+partie\s+de\s+l['’]opinion|D['’]aucuns)\b/i.test(
+          part1
+        ) &&
+          /\b(Par\s+contre|En\s+revanche|À\s+l['’]inverse|Au\s+contraire|Tandis\s+que)\b/i.test(
+            part1
+          )),
+      "Doc. 1 (Le premier document souligne que…) + Doc. 2 (En revanche, le second estime que…) + synonymes",
+    ],
+    [
+      "Avis clair",
+      OPINION_RE.test(part2) ||
+        /\b(Pour\s+ma\s+part|À\s+ce\s+sujet|Personnellement|Je\s+considère|Il\s+me\s+semble|J['’]estime|Selon\s+moi|À\s+mon\s+avis)\b/i.test(
+          part2
+        ),
+      "Pour ma part, je pense que… · À ce sujet, il est important de reconnaître que…",
+    ],
+    [
+      "2 arguments minimum",
+      argsPart2 >= 2,
+      "Tout d'abord,… En effet,… + De plus,… (≥2 marqueurs dans la Partie 2)",
+    ],
+    [
+      "Exemple concret",
+      exPart2,
+      "Par exemple, · Notamment · À savoir (1 exemple concret dans Partie 2)",
+    ],
+    [
+      "Conclusion",
+      conclPart2,
+      "Pour conclure · En somme · Finalement · En définitive",
+    ],
+    [
+      "120-180 mots",
+      n >= 120 && n <= 180 && n1 >= 30 && n1 <= 70 && n2 >= 70,
+      `Total ${n} mots · Partie1 ${n1} (cible 40-60) · Partie2 ${n2} (cible 80-120) · cible globale 150-175`,
+    ],
+    [
+      "⚠️ Règle rose · Partie 1 sans avis personnel",
+      regleRoseOk,
+      "Partie 1 · 0 « je pense » · 0 argument personnel · 0 copier-coller de phrases des documents",
+    ],
+  ];
+}
+
 export const TACHES: Record<1 | 2 | 3, Tache> = {
   1: {
     titre: "Tâche 1",
@@ -96,18 +229,7 @@ export const TACHES: Record<1 | 2 | 3, Tache> = {
         "« À ce sujet, il est important de reconnaître que… voilà pourquoi il est nécessaire de… »",
       ],
     ],
-    formules: [
-      "De nos jours, la question de ",
-      "divise l'opinion publique. ",
-      "Certains estiment que ",
-      "Le premier document soutient que ",
-      "Par contre, d'autres trouvent que ",
-      "À l'inverse, le second document rappelle que ",
-      "À ce sujet, il est important de reconnaître que ",
-      "Pour ma part, je considère que ",
-      "Voilà pourquoi il est nécessaire de ",
-      "En définitive, il me semble que ",
-    ],
+    formules: _FLAT_CONNECTEURS_T3,
   },
 };
 

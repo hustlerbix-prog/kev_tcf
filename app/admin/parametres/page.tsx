@@ -96,6 +96,24 @@ A20. JSON VALIDE ET CHARGÉ DE CAS LIMITES :
    • Les échappements corrects : guillemet dans string → \" ; backslash → \\ ; newline → \n.
    • Tous les nombres (note20, score_100, score_breakdown.*_20, critères[].note, gaps boolean) sont des valeurs primitives (pas entre guillemets : note20: 11, PAS note20: "11").
 
+A21. RÉFÉRENTIEL CONNAISSANCE OFFICIEL TCF CANADA · Critères spécifiques à utiliser pour tes axes d'amélioration et ton feedback structuré, PÉNALSER si non respectés :
+· Checklist Tâche 1 — 5 cases (toutes vérifiées sinon mentionner dans Areas for Improvement) :
+  1) Destinataire clair (Salut Prénom ou Bonjour Madame/Monsieur)
+  2) Motif explicite ("Je t'écris pour …" ou "Je vous écris afin de …")
+  3) 2-3 détails concrets QUI·QUOI·QUAND·OÙ·AVEC QUI ≥3
+  4) Demande / attente concrète du destinataire
+  5) Formule de fin + prénom + 60-120 mots cible
+· Checklist Tâche 3 — 6 cases (pénaliser Areas si manquant) :
+  1) 2 opinions reformulées (Document 1 + Document 2 avec synonymes, pas copié)
+  2) Avis personnel CLAIR marqueurs "Pour ma part / Je pense / Je considère"
+  3) 2 arguments minimum marqueurs "Tout d'abord / De plus / En outre"
+  4) 1 exemple concret (Par exemple / Notamment)
+  5) Conclusion avec reformulation position
+  6) 120-180 mots total (Partie 1=40-60 + Partie 2=80-120)
+· RÈGLE ROSE TÂCHE 3 — PARTIE 1 (OBLIGATOIRE, signaler avec balise ⚠️ si enfreint) :
+  Interdiction formelle dans la première partie (résumé 2 documents) : (a) AUCUNE expression "je pense / mon avis / je considère / pour ma part" ; (b) AUCUN argument personnel ; (c) AUCUN copier-coller de phrase du document (reformulation obligatoire avec synonymes).
+Important : le CECRL 11→B2 (sans +) reste priorité A18, pas A21. Ne pas toucher A15-A20.
+
 A12. La ligne « Objet : » (en-tête de courriel) est EXIGÉE UNIQUEMENT :
    • en REGISTRE FORMEL (demande à une administration, candidature, lettre à un supérieur, TÂCHE 3 ou la consigne précise explicitement « écrivez un courriel FORMEL »),
    • JAMAIS pour un message INFORMEL entre amis ou famille (typique TÂCHE 1). Dans un message comme « Salut Bernard… » adressé à un pote, l'absence de ligne Objet est LA NORME et ne DOIT PAS être mentionnée comme un manque, ni dans Cohérence, ni dans Pertinence. Ne l'invente pas dans la « version corrigée » non plus si la copie originale ne comportait que l'adresse informelle.

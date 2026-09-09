@@ -29,6 +29,19 @@ const LIENS: {
     label: "Conjugaisons",
     href: "/expression-ecrite?tab=conjugaison",
   },
+  {
+    id: "editeur",
+    label: (
+      <span style={{ paddingLeft: 22, display: "inline-block" }}>
+        <span aria-hidden style={{ color: "var(--color-encre-3)", marginRight: 8 }}>
+          └
+        </span>
+        📚 Base de connaissance
+      </span>
+    ),
+    href: "/expression-ecrite?tab=connaissance",
+    sous: true,
+  },
   { id: "prompts", label: "Tous les sujets", href: "/expression-ecrite/prompts" },
   {
     id: "progression",

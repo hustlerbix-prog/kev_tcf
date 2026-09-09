@@ -5,6 +5,8 @@ import {
   structure,
   couperT3,
   motsDe,
+  checklistOfficielleT1,
+  checklistOfficielleT3,
 } from "@/lib/heuristiques/taches";
 import { CONNECTEURS, MARQ_TU, MARQ_VOUS } from "@/lib/heuristiques";
 import type { ErreurLive, CodeErreur } from "@/lib/types/tcf";
@@ -225,6 +227,50 @@ export default function PanneauLive({
     ? erreurs.length + " signalements · " + h + " graves"
     : "";
 
+  let checklistItems: string[] = [];
+  let checklistFaits = 0;
+  let checklistTotal = 0;
+  let checklistTitre = "";
+  if (tacheActive === 1 || tacheActive === 3) {
+    const cl = tacheActive === 1 ? checklistOfficielleT1(txt) : checklistOfficielleT3(txt);
+    checklistTitre = tacheActive === 1 ? "Checklist officielle Tâche 1" : "Checklist officielle Tâche 3";
+    checklistTotal = cl.length;
+    checklistFaits = cl.filter((x) => !!x[1]).length;
+    checklistItems = cl.map((x, idx) => {
+      const label = x[0];
+      const ok = !!x[1];
+      const aide = x[2];
+      const estRegleRose = tacheActive === 3 && idx === 6;
+      const couleurFond = estRegleRose
+        ? (ok ? "rgba(60,207,145,.10)" : "rgba(239,143,160,.11)")
+        : (ok ? "rgba(60,207,145,.10)" : "rgba(232,168,60,.10)");
+      const couleurTexte = estRegleRose
+        ? (ok ? "#14532d" : "#A83C14")
+        : (ok ? "#14532d" : "#7C4A00");
+      const icone = ok ? "✅" : (estRegleRose ? "❌" : "⚠️");
+      const bord = estRegleRose
+        ? (ok ? "1px solid rgba(60,207,145,.35)" : "1px solid rgba(239,143,160,.28)")
+        : (ok ? "1px solid rgba(60,207,145,.30)" : "1px solid rgba(232,168,60,.25)");
+      return (
+        "<li style=\"margin:0 0 6px;padding:7px 9px;border-radius:8px;background:" + couleurFond + ";color:" + couleurTexte + ";border:" + bord + ";font-size:12.5px;line-height:1.45\"><span style=\"margin-right:6px\">" +
+        icone +
+        "</span><b>" + esc(label) + "</b>" +
+        (ok ? "" : "<br><span style=\"opacity:.85;font-size:11.7px;margin-left:22px\">" + esc(aide) + "</span>") +
+        "</li>"
+      );
+    });
+  }
+  const checklistBloc =
+    checklistTotal === 0
+      ? ""
+      : bloc(
+          "chk",
+          checklistTitre,
+          checklistFaits === checklistTotal ? "p-ok" : "p-am",
+          checklistFaits + "/" + checklistTotal,
+          checklistItems
+        );
+
   return (
     <section className="carte sombre">
       <div className="entete-carte">
@@ -287,7 +333,8 @@ export default function PanneauLive({
               lex.length || "✓",
               lex.map(ligne)
             ) +
-            bloc("coh", "Cohérence et structure", "p-am", conn.length, coh),
+            bloc("coh", "Cohérence et structure", "p-am", conn.length, coh) +
+            checklistBloc,
         }}
       />
     </section>
