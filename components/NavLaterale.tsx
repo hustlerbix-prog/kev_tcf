@@ -16,7 +16,7 @@ interface Props {
   routeActive?: string;
 }
 
-const LIENS: {
+const LIENS_EE: {
   id: SectionNav;
   label: ReactNode;
   href: string;
@@ -73,7 +73,44 @@ const LIENS: {
   { id: "admin", label: "⚙ Admin", href: "/admin/parametres" },
 ];
 
-function estActif(l: (typeof LIENS)[number], actif?: SectionNav, routeActive?: string): boolean {
+const LIENS_EO: {
+  id: SectionNav;
+  label: ReactNode;
+  href: string;
+  match?: string;
+  sous?: boolean;
+}[] = [
+  {
+    id: "editeur",
+    label: (
+      <span style={{ paddingLeft: 22, display: "inline-block" }}>
+        <span aria-hidden style={{ color: "var(--color-encre-3)", marginRight: 8 }}>
+          └
+        </span>
+        📚 Base EO Fiches
+      </span>
+    ),
+    href: "/expression-orale?tab=connaissance",
+    sous: true,
+  },
+  {
+    id: "prompts",
+    label: (
+      <span style={{ paddingLeft: 22, display: "inline-block" }}>
+        <span aria-hidden style={{ color: "var(--color-encre-3)", marginRight: 8 }}>
+          └
+        </span>
+        💬 Tous les sujets oraux
+      </span>
+    ),
+    href: "/expression-orale?tab=sujets",
+    sous: true,
+  },
+];
+
+type Lien = (typeof LIENS_EE)[number];
+
+function estActif(l: Lien, actif?: SectionNav, routeActive?: string): boolean {
   if (actif && actif === l.id) return true;
   if (routeActive && routeActive.length) {
     const m = l.match ?? l.href;
@@ -81,6 +118,23 @@ function estActif(l: (typeof LIENS)[number], actif?: SectionNav, routeActive?: s
     if (l.sous && routeActive.startsWith(m)) return true;
   }
   return false;
+}
+
+function renduLien(l: Lien, actif?: SectionNav, routeActive?: string) {
+  const ariaCurrent = estActif(l, actif, routeActive) ? "page" : undefined;
+  const style = l.sous && ariaCurrent !== "page"
+    ? { fontSize: 13, color: "var(--color-encre-2)" }
+    : undefined;
+  return (
+    <Link
+      key={l.href}
+      href={l.href}
+      aria-current={ariaCurrent}
+      style={style}
+    >
+      {l.label}
+    </Link>
+  );
 }
 
 export default function NavLaterale({ actif, routeActive }: Props) {
@@ -91,22 +145,15 @@ export default function NavLaterale({ actif, routeActive }: Props) {
         <span>Expression écrite · NCLC 8</span>
       </div>
       <nav>
-        {LIENS.map((l) => {
-          const ariaCurrent = estActif(l, actif, routeActive) ? "page" : undefined;
-          const style = l.sous && ariaCurrent !== "page"
-            ? { fontSize: 13, color: "var(--color-encre-2)" }
-            : undefined;
-          return (
-            <Link
-              key={l.id}
-              href={l.href}
-              aria-current={ariaCurrent}
-              style={style}
-            >
-              {l.label}
-            </Link>
-          );
-        })}
+        {LIENS_EE.map((l) => renduLien(l, actif, routeActive))}
+      </nav>
+      <hr style={{ margin: "12px 4px", borderTop: "1px solid rgba(0,0,0,.08)" }} />
+      <div className="marque-laterale">
+        <b>🎙 Expression Orale</b>
+        <span>· NCLC 8</span>
+      </div>
+      <nav>
+        {LIENS_EO.map((l) => renduLien(l, actif, routeActive))}
       </nav>
     </aside>
   );

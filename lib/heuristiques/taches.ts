@@ -17,6 +17,20 @@ const _FLAT_CONNECTEURS_T3: string[] = Object.values(CONNECTEURS_T3_GROUPE).redu
   [] as string[]
 );
 
+export const CONNECTEURS_ORAUX_GROUPE: Record<string, string[]> = {
+  "POUR COMPARER": ["En revanche", "À l'inverse", "Tandis que"],
+  "POUR AJOUTER": ["Tout d'abord", "De plus", "En outre"],
+  "POUR EXPLIQUER": ["En effet", "Car", "Parce que"],
+  "POUR DONNER UN EXEMPLE": ["Par exemple", "Notamment", "À savoir"],
+  "POUR NUANCER": ["Cependant", "Pourtant", "Néanmoins"],
+  "POUR CONCLURE": ["Pour conclure", "En somme", "Finalement"],
+  "MARQUEURS HÉSITATION ORALE": [
+    "Écoute…", "Ben…", "Dis donc…", "Franchement…",
+    "Justement…", "Après…", "En même temps…", "Enfin bref…",
+    "Bon", "Bah…", "Voyons…", "Tiens…"
+  ],
+};
+
 export function checklistOfficielleT1(
   txt: string
 ): [label: string, ok: boolean, aide: string][] {

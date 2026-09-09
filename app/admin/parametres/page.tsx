@@ -114,6 +114,24 @@ A21. RÉFÉRENTIEL CONNAISSANCE OFFICIEL TCF CANADA · Critères spécifiques à
   Interdiction formelle dans la première partie (résumé 2 documents) : (a) AUCUNE expression "je pense / mon avis / je considère / pour ma part" ; (b) AUCUN argument personnel ; (c) AUCUN copier-coller de phrase du document (reformulation obligatoire avec synonymes).
 Important : le CECRL 11→B2 (sans +) reste priorité A18, pas A21. Ne pas toucher A15-A20.
 
+A22. RÉFÉRENTIEL CONNAISSANCE EXPRESSION ORALE · TCF CANADA Septembre 2026 · Prendre en compte UNIQUEMENT si la consigne est une épreuve ORALE (sinon, IGNORER TOTALEMENT cette section).
+· Tâche 1 ORALE : Décrire 1 image ~2 min. Critères : présentation globale → 1er plan → 2d plan → contexte → commentaire final. Connecteurs : Tout d'abord / Au premier plan / À l'arrière-plan / Enfin.
+· Tâche 2 ORALE · Jeu de rôle ~6 min. Critères pénalisés si absents :
+  1) Salutation + prise de contact 1-2 échanges
+  2) 3-4 questions OUVERTES minimum (Quel…? / Comment…? / Où…? / Pourquoi…? / Combien…? / Est-ce que…?) ; 0 questions fermées oui/non sauf confirmation
+  3) Rebond / Écoute active : reformulation ("Donc si je t'ai bien compris…") + approfondissement
+  4) Remerciements + conclusion 1-2 échanges
+  → 7 scenarios types (se référencer) : Installation ville / Santé & soins / Nouvel An Canada / Emploi été / Végétarien / Fête école / Louer logement.
+· Tâche 3 ORALE · Exposé-débat ~6 min. Structure OBLIGÉE (2 min monologue):
+  1) Annonce de la réponse claire
+  2) Thèse précise
+  3) 2 arguments SOLIDES, chacun suivi EXEMPLE CONCRET (chiffres, cas Canada, étude)
+  4) Nuance reconnaître point faible + contre-nuance
+  5) Conclusion reformulée.
+→ 8 sujets Septembre 2026 à connaître : Téléphone portable / Autorité éducative / Immigrés pays accueil / Animaux danger / Bonheur au travail / Lire perte temps / Vie seule / Manger équilibré.
+· Connecteurs oraux obligatoires : 18 officiels + 12 marqueurs hésitation orale (Écoute… / Ben… / Dis donc… / Franchement… / Justement… / En même temps… / Enfin bref… / Voyons… / Tiens…) → MAX 1 marqueur/minute, sinon naturel disparaît.
+· A22 est à IGNORER ENTIÈREMENT si on est dans EXPRESSION ÉCRITE (EE). Ne jamais pénaliser EE à partir des règles orales A22. Priorité A18 (CECRL sans +) reste la plus haute, même EO.
+
 A12. La ligne « Objet : » (en-tête de courriel) est EXIGÉE UNIQUEMENT :
    • en REGISTRE FORMEL (demande à une administration, candidature, lettre à un supérieur, TÂCHE 3 ou la consigne précise explicitement « écrivez un courriel FORMEL »),
    • JAMAIS pour un message INFORMEL entre amis ou famille (typique TÂCHE 1). Dans un message comme « Salut Bernard… » adressé à un pote, l'absence de ligne Objet est LA NORME et ne DOIT PAS être mentionnée comme un manque, ni dans Cohérence, ni dans Pertinence. Ne l'invente pas dans la « version corrigée » non plus si la copie originale ne comportait que l'adresse informelle.

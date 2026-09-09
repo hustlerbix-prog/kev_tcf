@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { markdownLite } from "@/lib/utils/markdownLite";
-import { CONNECTEURS_T3_GROUPE } from "@/lib/heuristiques/taches";
+import { CONNECTEURS_T3_GROUPE, CONNECTEURS_ORAUX_GROUPE } from "@/lib/heuristiques/taches";
 
 type BlocConnaissance = {
   id: string;
-  tache_num: 1 | 2 | 3;
+  tache_num: 0 | 1 | 2 | 3;
+  competence_code?: "EE" | "EO" | "CE" | "CO";
   slug: string;
   bloc_type: "objectif" | "squelette" | "connecteurs" | "checklist" | "exemple" | "avertissement";
   titre: string;
@@ -16,27 +17,38 @@ type BlocConnaissance = {
 };
 
 interface Props {
-  tache: 1 | 2 | 3;
+  tache: 0 | 1 | 2 | 3;
   ouvert: boolean;
   onToggle: () => void;
   className?: string;
+  competence?: "EE" | "EO";
 }
 
 type OngletT3 = "schema" | "partie1" | "partie2";
+type OngletEO2 = "scenarios" | "corrections";
+type OngletEO3 = "sujets" | "schema";
 
 const TITRE_T1 = "📚 Base de connaissance · Tâche ";
 
-export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, className }: Props) {
+export default function BaseConnaissanceSidebar({
+  tache,
+  ouvert,
+  onToggle,
+  className,
+  competence = "EE",
+}: Props) {
   const [blocs, setBlocs] = useState<BlocConnaissance[]>([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ongletT3, setOngletT3] = useState<OngletT3>("schema");
+  const [ongletEO2, setOngletEO2] = useState<OngletEO2>("scenarios");
+  const [ongletEO3, setOngletEO3] = useState<OngletEO3>("sujets");
 
   useEffect(() => {
     let alive = true;
     setChargement(true);
     setErreur(null);
-    fetch("/api/connaissance?tache=" + tache)
+    fetch(`/api/connaissance?competence=${competence}&tache=${tache}`)
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
@@ -45,38 +57,65 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
       })
       .catch((e) => alive && setErreur(String(e)))
       .finally(() => alive && setChargement(false));
-    return () => { alive = false; };
-  }, [tache]);
+    return () => {
+      alive = false;
+    };
+  }, [tache, competence]);
 
   const bySlug = (s: string) => blocs.find((b) => b.slug === s);
+  const bySlugPrefix = (prefix: string) =>
+    blocs.filter((b) => b.slug.startsWith(prefix)).sort((a, b) => a.ordre - b.ordre);
 
-  const renduBloc = (b: BlocConnaissance | undefined, opts?: { rose?: boolean }) => {
+  const renduBloc = (b: BlocConnaissance | undefined, opts?: { rose?: boolean; vert?: boolean }) => {
     if (!b) return null;
     const estAvert = b.bloc_type === "avertissement" || b.slug === "t3-partie1-deux-opinions";
-    const styleRose = estAvert || opts?.rose
-      ? { background: "rgba(239,143,160,.11)", color: "#A83C14", border: "1px solid rgba(239,143,160,.28)", borderRadius: 10, padding: "10px 12px" }
-      : { background: "var(--color-papier-2)", borderRadius: 10, padding: "10px 12px" };
+    let styleBloc: React.CSSProperties;
+    if (opts?.vert) {
+      styleBloc = {
+        background: "rgba(60,207,145,.06)",
+        border: "1px solid rgba(60,207,145,.2)",
+        borderRadius: 10,
+        padding: "10px 12px",
+      };
+    } else {
+      const styleRose = estAvert || opts?.rose
+        ? {
+            background: "rgba(239,143,160,.11)",
+            color: "#A83C14",
+            border: "1px solid rgba(239,143,160,.28)",
+            borderRadius: 10,
+            padding: "10px 12px",
+          }
+        : { background: "var(--color-papier-2)", borderRadius: 10, padding: "10px 12px" };
+      styleBloc = styleRose;
+    }
+    const couleurTitre = estAvert ? "#A83C14" : "var(--color-encre)";
     return (
       <div key={b.id} style={{ marginBottom: 12 }}>
-      {b.titre && (
-        <h4 style={{
-          margin: "0 0 6px",
-          fontSize: 14,
-          fontWeight: 700,
-          color: estAvert ? "#A83C14" : "var(--color-encre)",
-          letterSpacing: "-.01em",
-        }}>
-          {estAvert ? "⚠️ " : ""}{b.titre}
-        </h4>
-      )}
-      {b.description && (
-        <p style={{ margin: "0 0 6px", color: "var(--color-encre-2)", fontSize: 13 }}>{b.description}</p>
-      )}
-      <div
-        style={styleRose}
-        dangerouslySetInnerHTML={{ __html: markdownLite(b.contenu_markdown) }}
-      />
-    </div>
+        {b.titre && (
+          <h4
+            style={{
+              margin: "0 0 6px",
+              fontSize: 14,
+              fontWeight: 700,
+              color: couleurTitre,
+              letterSpacing: "-.01em",
+            }}
+          >
+            {estAvert ? "⚠️ " : ""}
+            {b.titre}
+          </h4>
+        )}
+        {b.description && (
+          <p style={{ margin: "0 0 6px", color: "var(--color-encre-2)", fontSize: 13 }}>
+            {b.description}
+          </p>
+        )}
+        <div
+          style={styleBloc}
+          dangerouslySetInnerHTML={{ __html: markdownLite(b.contenu_markdown) }}
+        />
+      </div>
     );
   };
 
@@ -100,15 +139,41 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
           {renduBloc(bySlug("t3-connecteurs-6categories"))}
           {renduBloc(bySlug("t3-checklist-derniere-verification"))}
           <div style={{ marginTop: 10 }}>
-            <h4 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, color: "var(--color-encre)" }}>
+            <h4
+              style={{
+                margin: "0 0 6px",
+                fontSize: 14,
+                fontWeight: 700,
+                color: "var(--color-encre)",
+              }}
+            >
               🧠 Connecteurs officiels (6 catégories × 3)
             </h4>
-            <div style={{
-              display: "grid", gap: 8, gridTemplateColumns: "1fr", fontSize: 13 }}>
+            <div
+              style={{
+                display: "grid",
+                gap: 8,
+                gridTemplateColumns: "1fr",
+                fontSize: 13,
+              }}
+            >
               {Object.entries(CONNECTEURS_T3_GROUPE).map(([cat, trio]) => (
-                <div key={cat} style={{ background: "var(--color-papier-2)", borderRadius: 8, padding: "8px 10px" }}>
+                <div
+                  key={cat}
+                  style={{
+                    background: "var(--color-papier-2)",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                  }}
+                >
                   <b style={{ color: "#B8770B" }}>{cat}</b>
-                  <div style={{ marginTop: 4, fontFamily: "var(--font-mono)", color: "var(--color-encre)" }}>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontFamily: "var(--font-mono)",
+                      color: "var(--color-encre)",
+                    }}
+                  >
                     {trio.join(" · ")}
                   </div>
                 </div>
@@ -130,6 +195,96 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
       </div>
     );
   };
+
+  const contenuEO2 = () => {
+    if (ongletEO2 === "scenarios") {
+      const scenarios = bySlugPrefix("eo-t2-scenario-");
+      return (
+        <div>
+          {renduBloc(bySlug("eo-t2-schema"))}
+          {scenarios.map((s) => renduBloc(s, { vert: true }))}
+        </div>
+      );
+    }
+    const corrections = bySlugPrefix("eo-t2-corrections-");
+    return (
+      <div>
+        {renduBloc(bySlug("eo-objectif"))}
+        {renduBloc(bySlug("eo-t2-schema"))}
+        {corrections.map((c) => renduBloc(c))}
+      </div>
+    );
+  };
+
+  const contenuEO3 = () => {
+    if (ongletEO3 === "sujets") {
+      const sujets = bySlugPrefix("eo-t3-sujet-");
+      return (
+        <div>
+          {renduBloc(bySlug("eo-t3-objectif-schema"))}
+          {sujets.map((s) => renduBloc(s))}
+        </div>
+      );
+    }
+    return (
+      <div>
+        {renduBloc(bySlug("eo-t3-objectif-schema"))}
+        <div style={{ maxHeight: 320, overflowY: "auto", marginBottom: 12 }}>
+          {renduBloc(bySlug("eo-t3-sujet-manger-equilibre"))}
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <h4
+            style={{
+              margin: "0 0 6px",
+              fontSize: 14,
+              fontWeight: 700,
+              color: "var(--color-encre)",
+            }}
+          >
+            🎙 Connecteurs oraux + marqueurs d'hésitation
+          </h4>
+          <div
+            style={{
+              display: "grid",
+              gap: 8,
+              gridTemplateColumns: "1fr",
+              fontSize: 13,
+            }}
+          >
+            {Object.entries(CONNECTEURS_ORAUX_GROUPE).map(([cat, liste]) => (
+              <div
+                key={cat}
+                style={{
+                  background: "var(--color-papier-2)",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                }}
+              >
+                <b style={{ color: "#0B8043" }}>{cat}</b>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--color-encre)",
+                  }}
+                >
+                  {liste.join(" · ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const estEE = competence === "EE";
+  const titreHeader = estEE ? TITRE_T1 + tache : `🎙 Fiches · Expression Orale · Tâche ${tache}`;
+  const maxHeightOuvert = estEE
+    ? tache === 3
+      ? 2200
+      : 1800
+    : 2600;
 
   return (
     <section
@@ -159,7 +314,7 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
           borderRadius: 12,
         }}
       >
-        <span>{TITRE_T1 + tache}</span>
+        <span>{titreHeader}</span>
         <span style={{ fontSize: 13, color: "var(--color-encre-2)" }}>
           {ouvert ? "▾ Masquer" : "▸ Afficher"}
         </span>
@@ -167,7 +322,7 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
       <div
         style={{
           overflow: "hidden",
-          maxHeight: ouvert ? (tache === 3 ? 2200 : 1800) : 0,
+          maxHeight: ouvert ? maxHeightOuvert : 0,
           transition: "max-height 300ms ease",
         }}
       >
@@ -178,19 +333,30 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
             </div>
           )}
           {!chargement && erreur && (
-            <div style={{ padding: 12, background: "rgba(239,143,160,.1)", color: "#A83C14", borderRadius: 10 }}>
+            <div
+              style={{
+                padding: 12,
+                background: "rgba(239,143,160,.1)",
+                color: "#A83C14",
+                borderRadius: 10,
+              }}
+            >
               {erreur}
             </div>
           )}
           {!chargement && !erreur && blocs.length === 0 && (
             <div style={{ padding: 14, textAlign: "center", color: "var(--color-encre-3)" }}>
-              Aucun bloc disponible — appliquez les migrations 006/007 Supabase.
+              Aucun bloc disponible — appliquez les migrations Supabase.
             </div>
           )}
           {!chargement && !erreur && blocs.length > 0 && (
             <>
-              {tache === 3 && (
-                <div role="tablist" className="onglets" style={{ marginBottom: 14, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {estEE && tache === 3 && (
+                <div
+                  role="tablist"
+                  className="onglets"
+                  style={{ marginBottom: 14, display: "flex", gap: 6, flexWrap: "wrap" }}
+                >
                   {([
                     ["schema", "📋 Schéma + Connecteurs"],
                     ["partie1", "🧭 Partie 1 · 2 opinions"],
@@ -205,8 +371,76 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
                         padding: "6px 10px",
                         borderRadius: 999,
                         border: "1px solid rgba(0,0,0,.1)",
-                        background: ongletT3 === k ? "var(--color-encre)" : "var(--color-papier-2)",
-                        color: ongletT3 === k ? "var(--color-papier)" : "var(--color-encre)",
+                        background:
+                          ongletT3 === k ? "var(--color-encre)" : "var(--color-papier-2)",
+                        color:
+                          ongletT3 === k ? "var(--color-papier)" : "var(--color-encre)",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!estEE && tache === 2 && (
+                <div
+                  role="tablist"
+                  className="onglets"
+                  style={{ marginBottom: 14, display: "flex", gap: 6, flexWrap: "wrap" }}
+                >
+                  {([
+                    ["scenarios", "🎬 Scénarios (7)"],
+                    ["corrections", "✅ Corrections (20)"],
+                  ] as [OngletEO2, string][]).map(([k, label]) => (
+                    <button
+                      key={k}
+                      role="tab"
+                      aria-selected={ongletEO2 === k}
+                      onClick={() => setOngletEO2(k)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(0,0,0,.1)",
+                        background:
+                          ongletEO2 === k ? "var(--color-encre)" : "var(--color-papier-2)",
+                        color:
+                          ongletEO2 === k ? "var(--color-papier)" : "var(--color-encre)",
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!estEE && tache === 3 && (
+                <div
+                  role="tablist"
+                  className="onglets"
+                  style={{ marginBottom: 14, display: "flex", gap: 6, flexWrap: "wrap" }}
+                >
+                  {([
+                    ["sujets", "💬 Sujets (8)"],
+                    ["schema", "📋 Schéma + Exemple"],
+                  ] as [OngletEO3, string][]).map(([k, label]) => (
+                    <button
+                      key={k}
+                      role="tab"
+                      aria-selected={ongletEO3 === k}
+                      onClick={() => setOngletEO3(k)}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(0,0,0,.1)",
+                        background:
+                          ongletEO3 === k ? "var(--color-encre)" : "var(--color-papier-2)",
+                        color:
+                          ongletEO3 === k ? "var(--color-papier)" : "var(--color-encre)",
                         fontSize: 12.5,
                         fontWeight: 600,
                         cursor: "pointer",
@@ -218,10 +452,26 @@ export default function BaseConnaissanceSidebar({ tache, ouvert, onToggle, class
                 </div>
               )}
               <div style={{ fontSize: 14, lineHeight: 1.6 }}>
-                {tache === 1 ? contenuT1() : tache === 3 ? contenuT3() : (
-                  <p style={{ color: "var(--color-encre-2)" }}>
-                    Aucune fiche spécifique pour la Tâche 2 — référez-vous aux consignes.
-                  </p>
+                {estEE ? (
+                  tache === 1 ? (
+                    contenuT1()
+                  ) : tache === 3 ? (
+                    contenuT3()
+                  ) : (
+                    <p style={{ color: "var(--color-encre-2)" }}>
+                      Aucune fiche spécifique pour la Tâche 2 — référez-vous aux consignes.
+                    </p>
+                  )
+                ) : (
+                  tache === 2 ? (
+                    contenuEO2()
+                  ) : tache === 3 ? (
+                    contenuEO3()
+                  ) : (
+                    <p style={{ color: "var(--color-encre-2)" }}>
+                      Aucune fiche spécifique pour cette tâche.
+                    </p>
+                  )
                 )}
               </div>
             </>

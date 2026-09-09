@@ -7,7 +7,8 @@ export const revalidate = 60;
 export type BlocConnaissance = {
   id: string;
   created_at: string;
-  tache_num: 1 | 2 | 3;
+  tache_num: 0 | 1 | 2 | 3;
+  competence_code: "EE" | "EO" | "CE" | "CO";
   slug: string;
   bloc_type:
     | "objectif"
@@ -56,27 +57,38 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const qTache = searchParams.get("tache");
-    let tacheFiltre: 1 | 2 | 3 | null = null;
+    const qCompetence = searchParams.get("competence") ?? "EE";
+
+    let tacheFiltre: 0 | 1 | 2 | 3 | null = null;
     if (qTache !== null) {
       const n = Number(qTache);
-      if (!Number.isInteger(n) || n < 1 || n > 3) {
+      if (!Number.isInteger(n) || n < 0 || n > 3) {
         return repondreJson(
-          { erreur: "tache invalide: attendu 1 | 2 | 3" },
+          { erreur: "tache invalide: attendu 0 | 1 | 2 | 3" },
           { status: 400 }
         );
       }
-      tacheFiltre = n as 1 | 2 | 3;
+      tacheFiltre = n as 0 | 1 | 2 | 3;
     }
+
+    if (!/^(EE|EO|CE|CO)$/.test(qCompetence)) {
+      return repondreJson(
+        { erreur: "competence invalide: attendu EE | EO | CE | CO" },
+        { status: 400 }
+      );
+    }
+    const competenceFiltre = qCompetence as "EE" | "EO" | "CE" | "CO";
 
     const supabase = await createClient();
     let query = supabase
       .from("base_connaissances_tcf")
       .select("*")
-      .eq("actif", true);
+      .eq("actif", true)
+      .eq("competence_code", competenceFiltre);
     if (tacheFiltre !== null) query = query.eq("tache_num", tacheFiltre);
-    query = query.order("tache_num", { ascending: true }).order("ordre", {
-      ascending: true,
-    });
+    query = query
+      .order("tache_num", { ascending: true })
+      .order("ordre", { ascending: true });
 
     const { data, error } = await query;
     if (error) {
