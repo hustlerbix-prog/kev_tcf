@@ -106,6 +106,34 @@ const LIENS_EO: {
     href: "/expression-orale?tab=sujets",
     sous: true,
   },
+  {
+    id: "editeur",
+    label: (
+      <span style={{ paddingLeft: 22, display: "inline-block" }}>
+        <span aria-hidden style={{ color: "var(--color-encre-3)", marginRight: 8 }}>
+          └
+        </span>
+        ⚙ Simulateur complet
+      </span>
+    ),
+    href: "/expression-orale/exam",
+    sous: true,
+    match: "/expression-orale/exam",
+  },
+  {
+    id: "historique",
+    label: (
+      <span style={{ paddingLeft: 22, display: "inline-block" }}>
+        <span aria-hidden style={{ color: "var(--color-encre-3)", marginRight: 8 }}>
+          └
+        </span>
+        📊 Historique
+      </span>
+    ),
+    href: "/expression-orale/historique",
+    sous: true,
+    match: "/expression-orale/historique",
+  },
 ];
 
 type Lien = (typeof LIENS_EE)[number];

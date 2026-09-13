@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "brandiva-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd '/Users/kevche_mini/Applications/Brandiva' && npm run dev -- -p 3100"],
+      "port": 3100
     }
   ]
 }

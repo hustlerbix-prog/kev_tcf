@@ -86,7 +86,7 @@ export function checklistOfficielleT3(
   const { a: part1, b: part2 } = couperT3(txt);
   const n1 = motsDe(part1);
   const n2 = motsDe(part2);
-  const argWords = /\b(Tout d'abord|De plus|En outre|En effet|Premièrement|Deuxièmement|Par ailleurs|D'une part|D'autre part)\b/i;
+  const argWords = /\b(Tout d'abord|De plus|En outre|En effet|Premièrement|Deuxièmement|Par ailleurs|D'une part|D'autre part)\b/gi;
   const argsPart2 = Array.from(part2.matchAll(argWords)).length;
   const marqueursAvis = /\b(le\s+premier\s+document|le\s+second\s+document|premier\s+texte|deuxième\s+texte|certains[^.]{0,80}(par\s+contre|en\s+revanche|à\s+l['’]inverse)[^.]{0,120}d['’]autres)\b/i;
   const deuxDocs = marqueursAvis.test(txt);
