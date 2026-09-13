@@ -322,7 +322,7 @@ export default function PageDetailArchetype() {
                 </div>
               </div>
 
-              {archetype.task === 2 && archetype.required_moves.length > 0 && (
+              {archetype.task === 2 && archetype.required_moves && archetype.required_moves.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
                   <div
                     style={{
@@ -611,7 +611,7 @@ export default function PageDetailArchetype() {
                 )}
             </div>
 
-            {archetype.lexical_field.length > 0 && (
+            {archetype.lexical_field && archetype.lexical_field.length > 0 && (
               <div
                 style={{
                   background: "var(--color-papier)",

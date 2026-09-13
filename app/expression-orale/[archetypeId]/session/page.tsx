@@ -667,7 +667,7 @@ function SessionRoomInner() {
             >
               {archetype.consigne}
             </div>
-            {archetype.task === 2 && archetype.required_moves.length > 0 && (
+            {archetype.task === 2 && archetype.required_moves && archetype.required_moves.length > 0 && (
               <ul style={{ margin: 0, paddingLeft: 20, color: "var(--color-encre-2)" }}>
                 {archetype.required_moves.map((m, i) => (
                   <li key={i} style={{ marginBottom: 4 }}>
