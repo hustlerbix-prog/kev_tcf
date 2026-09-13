@@ -157,21 +157,21 @@ export function useSpeechIo(
         }
 
         if (finalText) {
-          const trimmed = finalText.trim();
+          const trimmed = finalText;
+          try {
+            if (typeof (finalBufferRef as unknown as { current: string }).current === "string") {
+              finalBufferRef.current = (finalBufferRef.current ?? "") + trimmed;
+            }
+          } catch {
+            // ignore write errors
+          }
           setState((prev) => ({
             ...prev,
             partialTranscript: "",
-            finalTranscript: trimmed,
+            finalTranscript: (prev.finalTranscript + trimmed).trim(),
             silenceMs: 0,
           }));
           silenceStartRef.current = Date.now();
-          if (trimmed.length > 0) {
-            try {
-              onFinalTextRef.current?.(trimmed);
-            } catch {
-              // noop
-            }
-          }
         } else if (interim) {
           setState((prev) => ({
             ...prev,
@@ -214,12 +214,20 @@ export function useSpeechIo(
       rec.onend = () => {
         if (cancelled) return;
         stopSilenceTimer();
-        const hadFinal = finalBufferRef.current.trim().length > 0;
+        const finalRaw: string =
+          typeof (finalBufferRef as unknown as { current?: string })?.current === "string"
+            ? (finalBufferRef as unknown as { current: string }).current
+            : "";
+        const bufferTrimmed = finalRaw.trim();
+        const hadFinal = bufferTrimmed.length > 0;
         isListeningRef.current = false;
 
+        if (typeof (finalBufferRef as unknown as { current?: string })?.current === "string") {
+          (finalBufferRef as unknown as { current: string }).current = "";
+        }
+
         if (hadFinal) {
-          const text = finalBufferRef.current.trim();
-          finalBufferRef.current = "";
+          const text = bufferTrimmed;
           try {
             setState((prev) => ({
               ...prev,
@@ -239,7 +247,6 @@ export function useSpeechIo(
           return;
         }
 
-        finalBufferRef.current = "";
         setState((prev) => ({ ...prev, isListening: false, partialTranscript: "" }));
       };
 
@@ -366,9 +373,19 @@ export function useSpeechIo(
     const rec = recognitionRef.current;
     if (!rec) return;
 
+    // Reset final buffer (defensive: ensure ref exists; default to "" if not yet initialized
+    try {
+      if (typeof (finalBufferRef as unknown as { current?: string })?.current === "string") {
+        (finalBufferRef as unknown as { current: string }).current = "";
+      }
+    } catch {
+      // noop
+    }
+
     setState((prev) => ({
       ...prev,
       partialTranscript: "",
+      finalTranscript: "",
       silenceMs: 0,
     }));
 
