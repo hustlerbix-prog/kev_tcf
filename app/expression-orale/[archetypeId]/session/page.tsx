@@ -10,7 +10,7 @@ import {
   type SessionState,
 } from "@/lib/eo/sessionReducer";
 import { useEoTimer } from "@/lib/eo/useEoTimer";
-import { useSpeechIo } from "@/lib/eo/useSpeechIo";
+import { useSpeechIo, type RecordingMode } from "@/lib/eo/useSpeechIo";
 import type { Archetype, ExaminerTurnResult, ModeId, TaskId, Turn } from "@/lib/types/eo";
 
 function formatTaskDuration(a: Archetype): string {
@@ -355,12 +355,48 @@ function SessionRoomInner() {
   };
 
   const toggleMicro = () => {
+    const rMode = speechState.recordingMode;
     if (speechState.isListening) {
       speechApi.stopListening();
+    } else if (rMode === "ptt") {
+      // PTT: single click means start immediately (no hold), same as toggle for accessibility
+      if (state.kind === "LISTENING" || state.kind === "EXAMINER_OPENING") {
+        speechApi.cancelSpeak();
+        speechApi.startListening();
+      }
     } else if (state.kind === "LISTENING" || state.kind === "EXAMINER_OPENING") {
       speechApi.cancelSpeak();
       speechApi.startListening();
     }
+  };
+
+  const pttStart = (e?: React.SyntheticEvent) => {
+    if (speechState.recordingMode !== "ptt") return;
+    if (speechState.isListening) return;
+    if (!(state.kind === "LISTENING" || state.kind === "EXAMINER_OPENING")) return;
+    e?.preventDefault?.();
+    speechApi.cancelSpeak();
+    speechApi.startListening();
+  };
+
+  const pttStop = (e?: React.SyntheticEvent) => {
+    if (speechState.recordingMode !== "ptt") return;
+    if (!speechState.isListening) return;
+    e?.preventDefault?.();
+    speechApi.stopListening();
+  };
+
+  const setRecordingModeStable = (m: RecordingMode) => {
+    if (speechState.recordingMode === m) return;
+    // When switching mode while listening, stop first to release the mic with the correct silence semantics
+    if (speechState.isListening) {
+      try {
+        speechApi.stopListening();
+      } catch {
+        // noop
+      }
+    }
+    speechApi.setRecordingMode(m);
   };
 
   const handleQuitter = () => {
@@ -1136,26 +1172,91 @@ function SessionRoomInner() {
                 background: "rgba(0,0,0,0.02)",
               }}
             >
+              {isVoiceMode && speechState.sttAvailable && (
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: 6,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {(["auto", "toggle", "ptt"] as RecordingMode[]).map((m) => {
+                    const active = speechState.recordingMode === m;
+                    const label =
+                      m === "auto"
+                        ? "Auto (1,8s silence)"
+                        : m === "toggle"
+                        ? "Cliquer pour On / Off"
+                        : "Maintenir pour parler";
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setRecordingModeStable(m)}
+                        style={{
+                          padding: "6px 14px",
+                          borderRadius: 999,
+                          border: active
+                            ? "1px solid #256F51"
+                            : "1px solid rgba(0,0,0,0.14)",
+                          background: active
+                            ? "rgba(37, 111, 81, 0.12)"
+                            : "rgba(255,255,255,0.6)",
+                          color: active ? "#1F523A" : "var(--color-encre-3)",
+                          fontSize: 12,
+                          fontWeight: active ? 700 : 500,
+                          cursor: "pointer",
+                          letterSpacing: 0.1,
+                          fontFamily: "var(--font-mono)",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <div style={{ display: "flex", justifyContent: "center", gap: 20, alignItems: "center" }}>
                 <button
                   onClick={toggleMicro}
+                  onPointerDown={pttStart}
+                  onPointerUp={pttStop}
+                  onPointerLeave={(e) => {
+                    if (speechState.recordingMode === "ptt" && speechState.isListening) pttStop(e);
+                  }}
+                  onPointerCancel={(e) => {
+                    if (speechState.recordingMode === "ptt") pttStop(e);
+                  }}
+                  onContextMenu={(e) => {
+                    if (speechState.recordingMode === "ptt") e.preventDefault();
+                  }}
                   disabled={!canUseMicro && !speechState.isListening}
                   style={{
                     width: 88,
                     height: 88,
                     borderRadius: "50%",
                     background: speechState.isListening
-                      ? "rgba(190, 47, 70, 0.15)"
+                      ? speechState.recordingMode === "ptt"
+                        ? "rgba(37, 111, 81, 0.22)"
+                        : "rgba(190, 47, 70, 0.15)"
                       : canUseMicro
                       ? "rgba(37, 111, 81, 0.10)"
                       : "rgba(0,0,0,0.06)",
                     border: speechState.isListening
-                      ? "3px solid #BE2F46"
+                      ? speechState.recordingMode === "ptt"
+                        ? "3px solid #256F51"
+                        : "3px solid #BE2F46"
                       : canUseMicro
                       ? "2px solid rgba(37, 111, 81, 0.45)"
                       : "2px dashed rgba(0,0,0,0.2)",
                     color: speechState.isListening
-                      ? "#BE2F46"
+                      ? speechState.recordingMode === "ptt"
+                        ? "#256F51"
+                        : "#BE2F46"
                       : canUseMicro
                       ? "#256F51"
                       : "var(--color-encre-3)",
@@ -1164,78 +1265,147 @@ function SessionRoomInner() {
                       canUseMicro || speechState.isListening ? "pointer" : "not-allowed",
                     opacity: canUseMicro || speechState.isListening ? 1 : 0.6,
                     transition: "all 0.15s ease",
+                    touchAction: "none",
+                    userSelect: "none",
+                    outline: "none",
                   }}
-                  title={
-                    speechState.isListening
-                      ? "Arrêter l'écoute (Espace)"
-                      : canUseMicro
-                      ? "Parler — appuyez puis parlez (Espace)"
-                      : isVoiceMode
-                      ? "Micro désactivé (STT non dispo / attente tour)"
-                      : "Mode texte uniquement — changez le mode ?mode=drill_voice dans l'URL"
-                  }
+                  title={(() => {
+                    const m = speechState.recordingMode;
+                    if (speechState.isListening) {
+                      return m === "toggle"
+                        ? "⏹ Cliquer pour arrêter"
+                        : m === "ptt"
+                        ? "Relâcher pour arrêter"
+                        : "⏹ Arrêter ou attendre 1,8s de silence";
+                    }
+                    if (canUseMicro) {
+                      return m === "toggle"
+                        ? "🎙 Cliquer pour commencer"
+                        : m === "ptt"
+                        ? "🎙 Maintenir enfoncé pour parler"
+                        : "🎙 Cliquer puis parler (1,8s silence = fin)";
+                    }
+                    if (isVoiceMode) {
+                      return "Micro désactivé (STT non dispo / attente tour)";
+                    }
+                    return "Mode texte uniquement — ?mode=drill_voice dans l'URL";
+                  })()}
                 >
-                  {speechState.isListening ? "⏹" : "🎙"}
+                  {speechState.isListening
+                    ? speechState.recordingMode === "ptt"
+                      ? "🎙"
+                      : "⏹"
+                    : "🎙"}
                 </button>
 
-                {speechState.isListening && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 4,
-                      alignItems: "flex-start",
-                      minWidth: 200,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 11,
-                        color: "#BE2F46",
-                        fontWeight: 700,
-                        letterSpacing: "0.08em",
-                      }}
-                    >
-                      ENREGISTREMENT
-                    </div>
-                    <div
-                      style={{
-                        width: "100%",
-                        height: 6,
-                        background: "rgba(0,0,0,0.06)",
-                        borderRadius: 999,
-                        overflow: "hidden",
-                      }}
-                    >
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                    alignItems: "flex-start",
+                    minWidth: 220,
+                  }}
+                >
+                  {speechState.isListening ? (
+                    <>
                       <div
                         style={{
-                          height: "100%",
-                          width: `${Math.min(
-                            100,
-                            (speechState.silenceMs / 1800) * 100
-                          )}%`,
-                          background:
-                            speechState.silenceMs > 1200
-                              ? "#BE2F46"
-                              : speechState.silenceMs > 600
-                              ? "#F59E0B"
-                              : "#256F51",
-                          transition: "width 0.1s linear",
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 11,
+                          color:
+                            speechState.recordingMode === "ptt" ? "#256F51" : "#BE2F46",
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
                         }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: 10.5,
-                        color: "var(--color-encre-3)",
-                      }}
-                    >
-                      silence: {(speechState.silenceMs / 1000).toFixed(1)}s / 1.8s
-                    </div>
-                  </div>
-                )}
+                      >
+                        {speechState.recordingMode === "auto"
+                          ? "ENREGISTREMENT AUTO"
+                          : speechState.recordingMode === "toggle"
+                          ? "ENREGISTREMENT · CLIQUER ⏹ POUR STOP"
+                          : "ENREGISTREMENT · RELÂCHER BOUTON POUR STOP"}
+                      </div>
+                      {speechState.recordingMode === "auto" && (
+                        <>
+                          <div
+                            style={{
+                              width: "100%",
+                              height: 6,
+                              background: "rgba(0,0,0,0.06)",
+                              borderRadius: 999,
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              style={{
+                                height: "100%",
+                                width: `${Math.min(
+                                  100,
+                                  (speechState.silenceMs / 1800) * 100
+                                )}%`,
+                                background:
+                                  speechState.silenceMs > 1200
+                                    ? "#BE2F46"
+                                    : speechState.silenceMs > 600
+                                    ? "#F59E0B"
+                                    : "#256F51",
+                                transition: "width 0.1s linear",
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 10.5,
+                              color: "var(--color-encre-3)",
+                            }}
+                          >
+                            silence: {(speechState.silenceMs / 1000).toFixed(1)}s / 1.8s
+                          </div>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 11,
+                          color: "#4C5A6E",
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                        }}
+                      >
+                        {!isVoiceMode
+                          ? "MODE TEXTE"
+                          : !speechState.sttAvailable
+                          ? "STT INDISPONIBLE"
+                          : !canUseMicro
+                          ? "ATTENTE DU TOUR…"
+                          : speechState.recordingMode === "ptt"
+                          ? "MAINTENIR POUR PARLER"
+                          : speechState.recordingMode === "toggle"
+                          ? "CLIQUER POUR DÉMARRER"
+                          : "PRÊT · CLIQUER PUIS PARLER"}
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-mono)",
+                          fontSize: 10.5,
+                          color: "var(--color-encre-3)",
+                        }}
+                      >
+                        {isVoiceMode && speechState.sttAvailable
+                          ? speechState.recordingMode === "auto"
+                            ? "Fin automatique après 1,8s de silence"
+                            : speechState.recordingMode === "toggle"
+                            ? "Un clic ON / un clic OFF — pas d'arrêt automatique"
+                            : "Enregistre seulement tant que le bouton est enfoncé"
+                          : "Utiliser le textarea ci-dessous"}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
               <div
                 style={{

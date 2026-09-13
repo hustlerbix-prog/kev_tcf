@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+export type RecordingMode = "auto" | "toggle" | "ptt";
+
 export interface SpeechState {
   ttsAvailable: boolean;
   sttAvailable: boolean;
@@ -12,6 +14,7 @@ export interface SpeechState {
   partialTranscript: string;
   finalTranscript: string;
   silenceMs: number;
+  recordingMode: RecordingMode;
 }
 
 export interface SpeechApi {
@@ -27,6 +30,7 @@ export interface SpeechApi {
   ) => Promise<void>;
   cancelSpeak: () => void;
   setLang: (l: "fr-CA" | "fr-FR") => void;
+  setRecordingMode: (m: RecordingMode) => void;
   voices: SpeechSynthesisVoice[];
 }
 
@@ -70,6 +74,7 @@ export function useSpeechIo(
     partialTranscript: "",
     finalTranscript: "",
     silenceMs: 0,
+    recordingMode: "auto",
   });
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -82,6 +87,7 @@ export function useSpeechIo(
   const ttsRejectRef = useRef<((err: unknown) => void) | null>(null);
   const ttsUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const langRef = useRef<"fr-CA" | "fr-FR">("fr-CA");
+  const recordingModeRef = useRef<RecordingMode>("auto");
   const onFinalTextRef = useRef(onFinalText);
   const continuousRef = useRef(continuous);
   const isListeningRef = useRef(false);
@@ -98,6 +104,10 @@ export function useSpeechIo(
   useEffect(() => {
     langRef.current = state.lang;
   }, [state.lang]);
+
+  useEffect(() => {
+    recordingModeRef.current = state.recordingMode;
+  }, [state.recordingMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -266,11 +276,12 @@ export function useSpeechIo(
       silenceStartRef.current = Date.now();
       silenceTimerRef.current = setInterval(() => {
         const elapsed = Date.now() - silenceStartRef.current;
+        const mode = recordingModeRef.current;
         setState((prev) => ({
           ...prev,
-          silenceMs: Math.min(elapsed, 1800),
+          silenceMs: mode === "auto" ? Math.min(elapsed, 1800) : 0,
         }));
-        if (elapsed >= threshold && isListeningRef.current) {
+        if (mode === "auto" && elapsed >= threshold && isListeningRef.current) {
           try {
             stopListeningInternal(true);
           } catch {
@@ -498,12 +509,18 @@ export function useSpeechIo(
     setState((prev) => ({ ...prev, lang: l }));
   }, []);
 
+  const setRecordingMode = useCallback((m: RecordingMode) => {
+    recordingModeRef.current = m;
+    setState((prev) => (prev.recordingMode === m ? prev : { ...prev, recordingMode: m }));
+  }, []);
+
   const api: SpeechApi = {
     startListening,
     stopListening,
     speak,
     cancelSpeak,
     setLang,
+    setRecordingMode,
     voices,
   };
 
