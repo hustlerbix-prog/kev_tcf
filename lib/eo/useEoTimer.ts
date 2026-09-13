@@ -4,6 +4,7 @@ interface UseEoTimerParams {
   totalMs: number;
   running: boolean;
   onExpire?: () => void;
+  onTick?: (elapsedMs: number) => void;
   intervalMs?: number;
 }
 
@@ -27,16 +28,22 @@ export function useEoTimer({
   totalMs,
   running,
   onExpire,
+  onTick,
   intervalMs = 250,
 }: UseEoTimerParams): UseEoTimerResult {
   const [remainingMs, setRemainingMs] = useState(totalMs);
   const expiredRef = useRef(false);
   const intervalIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onExpireRef = useRef(onExpire);
+  const onTickRef = useRef(onTick);
 
   useEffect(() => {
     onExpireRef.current = onExpire;
   }, [onExpire]);
+
+  useEffect(() => {
+    onTickRef.current = onTick;
+  }, [onTick]);
 
   useEffect(() => {
     setRemainingMs(totalMs);
@@ -53,6 +60,11 @@ export function useEoTimer({
       }
       return next;
     });
+    try {
+      onTickRef.current?.(intervalMs);
+    } catch {
+      // noop
+    }
   }, [intervalMs]);
 
   useEffect(() => {
@@ -64,8 +76,6 @@ export function useEoTimer({
       return;
     }
 
-    if (remainingMs <= 0) return;
-
     intervalIdRef.current = setInterval(() => {
       tickOnce();
     }, intervalMs);
@@ -76,7 +86,7 @@ export function useEoTimer({
         intervalIdRef.current = null;
       }
     };
-  }, [running, intervalMs, tickOnce, remainingMs]);
+  }, [running, intervalMs, tickOnce]);
 
   const remainingPct =
     totalMs > 0 ? Math.max(0, Math.min(1, remainingMs / totalMs)) : 0;

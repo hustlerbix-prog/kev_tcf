@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState } from "react";
+import { Suspense, useEffect, useReducer, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import NavLaterale from "@/components/NavLaterale";
@@ -68,7 +68,7 @@ function examinerStatusFromKind(kind: SessionState["kind"]): {
   }
 }
 
-export default function PageSessionRoom() {
+function SessionRoomInner() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -88,11 +88,16 @@ export default function PageSessionRoom() {
   const mode: ModeId = archetypeId === "FULL-EXAM" ? "full_exam" : modeParam;
   const isVoiceMode = mode === "drill_voice" || mode === "conversation" || mode === "full_exam";
 
+  const handleCandidateTurnRef = useRef<(text: string) => void>(() => {});
+  const handleExaminerResponseRef = useRef<(r: ExaminerTurnResult) => Promise<void>>(
+    async () => {}
+  );
+
   const [speechState, speechApi] = useSpeechIo({
     onFinalText: (text) => {
       const trimmed = text.trim();
       if (trimmed.length === 0) return;
-      handleCandidateTurn(trimmed);
+      handleCandidateTurnRef.current?.(trimmed);
     },
     silenceThresholdMs: 1800,
     continuous: false,
@@ -102,6 +107,11 @@ export default function PageSessionRoom() {
     totalMs: state.prepTotalMs,
     running: state.kind === "PREPARING",
     intervalMs: 250,
+    onTick: (ms) => {
+      if (state.kind === "PREPARING") {
+        dispatch({ type: "TICK", payload: ms });
+      }
+    },
   });
 
   const mainTimer = useEoTimer({
@@ -113,26 +123,19 @@ export default function PageSessionRoom() {
       state.kind === "EXAMINER_TURN" ||
       state.kind === "EVALUATING",
     intervalMs: 250,
+    onTick: (ms) => {
+      const k = state.kind;
+      if (
+        k === "EXAMINER_OPENING" ||
+        k === "LISTENING" ||
+        k === "THINKING" ||
+        k === "EXAMINER_TURN" ||
+        k === "EVALUATING"
+      ) {
+        dispatch({ type: "TICK", payload: ms });
+      }
+    },
   });
-
-  useEffect(() => {
-    if (prepTimer.remainingMs !== state.prepRemainingMs && state.kind === "PREPARING") {
-      dispatch({ type: "TICK", payload: 250 });
-    }
-  }, [prepTimer.remainingMs, state.kind, state.prepRemainingMs]);
-
-  useEffect(() => {
-    if (
-      mainTimer.remainingMs !== state.remainingMs &&
-      (state.kind === "EXAMINER_OPENING" ||
-        state.kind === "LISTENING" ||
-        state.kind === "THINKING" ||
-        state.kind === "EXAMINER_TURN" ||
-        state.kind === "EVALUATING")
-    ) {
-      dispatch({ type: "TICK", payload: 250 });
-    }
-  }, [mainTimer.remainingMs, state.kind, state.remainingMs]);
 
   useEffect(() => {
     const el = transcriptRef.current;
@@ -278,6 +281,10 @@ export default function PageSessionRoom() {
     }
   };
 
+  useEffect(() => {
+    handleExaminerResponseRef.current = handleExaminerResponse;
+  }, [handleExaminerResponse]);
+
   const runExaminerTurn = async (candidateText?: string) => {
     if (!archetype) return;
 
@@ -335,6 +342,10 @@ export default function PageSessionRoom() {
     if (state.kind !== "LISTENING") return;
     void runExaminerTurn(trimmed);
   };
+
+  useEffect(() => {
+    handleCandidateTurnRef.current = handleCandidateTurn;
+  }, [handleCandidateTurn]);
 
   const handleSubmitText = () => {
     const t = textInput.trim();
@@ -729,19 +740,21 @@ export default function PageSessionRoom() {
                 color: "var(--color-encre)",
               }}
             >
-              Tâche terminée · Merci !
+              Tâche {state.currentTask} terminée · Merci !
             </div>
             <div
               style={{
                 fontSize: 14,
                 color: "var(--color-encre-2)",
-                maxWidth: 500,
+                maxWidth: 560,
+                lineHeight: 1.55,
               }}
             >
-              Votre performance a été enregistrée. Vous pouvez reprendre ou consulter
-              le rapport détaillé.
+              {state.transcript.length} échanges enregistrés. Vous pouvez reprendre,
+              évaluer votre performance pour cette tâche seule, ou consulter
+              l'historique global.
             </div>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "center" }}>
               <button
                 onClick={() => dispatch({ type: "RESET" })}
                 style={{
@@ -755,7 +768,83 @@ export default function PageSessionRoom() {
                   cursor: "pointer",
                 }}
               >
-                Reprendre
+                ↻ Reprendre (rejouer cette tâche)
+              </button>
+              <button
+                onClick={async () => {
+                  if (!archetype) return;
+                  dispatch({ type: "START_EVAL" });
+                  try {
+                    const evalRes = await fetch("/api/eo/evaluate", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        session: { mode, target_note_20: 10 },
+                        tasks: [
+                          {
+                            task: archetype.task,
+                            archetype: {
+                              id: archetype.id,
+                              task: archetype.task,
+                              consigne: archetype.consigne,
+                              question_ouverture: archetype.question_ouverture ?? null,
+                              required_moves: archetype.required_moves ?? null,
+                              examiner_role: archetype.examiner_role ?? null,
+                              scene_facts: archetype.scene_facts ?? null,
+                              complication: archetype.complication ?? null,
+                              arguments_pour: archetype.arguments_pour ?? null,
+                              arguments_contre: archetype.arguments_contre ?? null,
+                            },
+                            turns: state.transcript,
+                            prep_notes: notes || null,
+                          },
+                        ],
+                      }),
+                    });
+                    if (!evalRes.ok) throw new Error(`HTTP ${evalRes.status}`);
+                    const evalData = await evalRes.json();
+                    const sessRes = await fetch("/api/eo/sessions", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        mode,
+                        target_note_20: 10,
+                        evaluation: evalData.evaluation,
+                        tasks_snapshot: [
+                          {
+                            task: archetype.task,
+                            archetype_id: archetype.id,
+                            turns: state.transcript,
+                          },
+                        ],
+                      }),
+                    });
+                    let sessionId = archetype.id + "-" + Date.now();
+                    if (sessRes.ok) {
+                      const s = await sessRes.json();
+                      sessionId = s.session?.id || sessionId;
+                    }
+                    router.replace(`/expression-orale/session/${encodeURIComponent(sessionId)}`);
+                  } catch (e) {
+                    const msg = e instanceof Error ? e.message : String(e);
+                    dispatch({ type: "ERROR", payload: `Évaluation: ${msg}` });
+                    setNetworkError(`⚠ Évaluation échouée: ${msg} · Réessayez plus tard.`);
+                  }
+                }}
+                disabled={state.transcript.length === 0}
+                style={{
+                  padding: "12px 26px",
+                  borderRadius: 11,
+                  background: state.transcript.length === 0 ? "rgba(0,0,0,0.08)" : "#BE2F46",
+                  color: "var(--color-papier)",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  border: "1px solid rgba(0,0,0,0.2)",
+                  cursor: state.transcript.length === 0 ? "not-allowed" : "pointer",
+                  opacity: state.transcript.length === 0 ? 0.6 : 1,
+                }}
+              >
+                📊 Évaluer ma performance (cette tâche seule)
               </button>
               <Link
                 href="/expression-orale/historique"
@@ -772,9 +861,20 @@ export default function PageSessionRoom() {
                   display: "inline-block",
                 }}
               >
-                Voir le rapport
+                📚 Historique global
               </Link>
             </div>
+            {state.transcript.length === 0 && (
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: "var(--color-encre-3)",
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                ⚠ transcript vide — commencez un tour de dialogue pour évaluer.
+              </div>
+            )}
           </div>
         ) : state.kind === "EVALUATING" ? (
           <div
@@ -1229,5 +1329,40 @@ export default function PageSessionRoom() {
         `}</style>
       </main>
     </div>
+  );
+}
+
+export default function PageSessionRoom() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: "100vh",
+            background: "#FDF8F3",
+            fontFamily: "var(--font-sans)",
+            padding: "32px 24px",
+            color: "#1F2937",
+          }}
+        >
+          <NavLaterale routeActive={"/expression-orale"} />
+          <main
+            style={{
+              maxWidth: 1120,
+              margin: "32px auto 0 260px",
+              textAlign: "center",
+              paddingTop: 64,
+              color: "#4C5A6E",
+              fontSize: 20,
+              fontWeight: 500,
+            }}
+          >
+            Chargement…
+          </main>
+        </div>
+      }
+    >
+      <SessionRoomInner />
+    </Suspense>
   );
 }
