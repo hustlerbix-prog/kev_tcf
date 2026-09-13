@@ -31,6 +31,7 @@ export interface SpeechApi {
   cancelSpeak: () => void;
   setLang: (l: "fr-CA" | "fr-FR") => void;
   setRecordingMode: (m: RecordingMode) => void;
+  resetRecognition: () => void;
   voices: SpeechSynthesisVoice[];
 }
 
@@ -92,6 +93,7 @@ export function useSpeechIo(
   const continuousRef = useRef(continuous);
   const isListeningRef = useRef(false);
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | undefined>(undefined);
+  const finalBufferRef = useRef<string>("");
 
   useEffect(() => {
     onFinalTextRef.current = onFinalText;
@@ -179,18 +181,66 @@ export function useSpeechIo(
         }
       };
 
-      rec.onerror = () => {
+      rec.onerror = (ev: unknown) => {
         if (cancelled) return;
         stopSilenceTimer();
         isListeningRef.current = false;
+
+        let errCode = "unknown";
+        try {
+          errCode = String((ev as { error?: unknown })?.error ?? "unknown");
+        } catch {
+          errCode = "unknown";
+        }
+
+        const permissionDenied =
+          errCode === "not-allowed" ||
+          errCode === "service-not-allowed" ||
+          errCode === "permission-denied";
+
+        if (permissionDenied) {
+          setState((prev) => ({
+            ...prev,
+            isListening: false,
+            partialTranscript: "",
+            sttAvailable: false,
+          }));
+          return;
+        }
+
         setState((prev) => ({ ...prev, isListening: false, partialTranscript: "" }));
       };
 
       rec.onend = () => {
         if (cancelled) return;
         stopSilenceTimer();
+        const hadFinal = finalBufferRef.current.trim().length > 0;
         isListeningRef.current = false;
-        setState((prev) => ({ ...prev, isListening: false }));
+
+        if (hadFinal) {
+          const text = finalBufferRef.current.trim();
+          finalBufferRef.current = "";
+          try {
+            setState((prev) => ({
+              ...prev,
+              isListening: false,
+              finalTranscript: text,
+              partialTranscript: "",
+              silenceMs: 0,
+            }));
+          } catch {
+            // noop
+          }
+          try {
+            onFinalTextRef.current?.(text);
+          } catch {
+            // noop
+          }
+          return;
+        }
+
+        finalBufferRef.current = "";
+        setState((prev) => ({ ...prev, isListening: false, partialTranscript: "" }));
       };
 
       rec.onstart = () => {
@@ -514,6 +564,27 @@ export function useSpeechIo(
     setState((prev) => (prev.recordingMode === m ? prev : { ...prev, recordingMode: m }));
   }, []);
 
+  const resetRecognition = useCallback(() => {
+    // Stop any in-flight listening, silence timer and reset refs; next startListening recreates state
+    if (isListeningRef.current) {
+      isListeningRef.current = false;
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        // noop
+      }
+    }
+    stopSilenceTimer();
+    finalBufferRef.current = "";
+    setState((prev) => ({
+      ...prev,
+      isListening: false,
+      partialTranscript: "",
+      finalTranscript: "",
+      silenceMs: 0,
+    }));
+  }, [stopSilenceTimer]);
+
   const api: SpeechApi = {
     startListening,
     stopListening,
@@ -521,6 +592,7 @@ export function useSpeechIo(
     cancelSpeak,
     setLang,
     setRecordingMode,
+    resetRecognition,
     voices,
   };
 

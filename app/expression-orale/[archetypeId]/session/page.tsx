@@ -354,28 +354,66 @@ function SessionRoomInner() {
     handleCandidateTurn(t);
   };
 
+  const forceEnterListeningIfPossible = () => {
+    switch (state.kind) {
+      case "LISTENING":
+      case "EXAMINER_OPENING":
+      case "EXAMINER_TURN":
+      case "THINKING":
+        if (state.kind !== "LISTENING") {
+          try {
+            // If an examiner-turn request was already in flight, cancel its network effect best-effort:
+            // dispatch LISTENING_START first. If we're inside THINKING, we can't cancel the in-flight
+            // fetch but on completion it might go to EXAMINER_TURN, which is still fine since user
+            // intentionally barged in to speak.
+            dispatch({ type: "LISTENING_START" });
+          } catch {
+            // noop
+          }
+        }
+        // Also cancel any TTS so mic can start with barge-in semantics
+        try {
+          speechApi.cancelSpeak();
+        } catch {
+          // noop
+        }
+        return true;
+      default:
+        return false;
+    }
+  };
+
   const toggleMicro = () => {
-    const rMode = speechState.recordingMode;
     if (speechState.isListening) {
       speechApi.stopListening();
-    } else if (rMode === "ptt") {
-      // PTT: single click means start immediately (no hold), same as toggle for accessibility
-      if (state.kind === "LISTENING" || state.kind === "EXAMINER_OPENING") {
-        speechApi.cancelSpeak();
-        speechApi.startListening();
-      }
-    } else if (state.kind === "LISTENING" || state.kind === "EXAMINER_OPENING") {
-      speechApi.cancelSpeak();
-      speechApi.startListening();
+      return;
     }
+    if (!isVoiceMode) return;
+    const ok = forceEnterListeningIfPossible();
+    if (!ok) {
+      // Kind like TASK_COMPLETE/EVALUATING/REPORT/PREPARING/IDLE — ignore; button will be visually disabled
+      return;
+    }
+    try {
+      speechApi.cancelSpeak();
+    } catch {
+      // noop
+    }
+    speechApi.startListening();
   };
 
   const pttStart = (e?: React.SyntheticEvent) => {
     if (speechState.recordingMode !== "ptt") return;
     if (speechState.isListening) return;
-    if (!(state.kind === "LISTENING" || state.kind === "EXAMINER_OPENING")) return;
+    if (!isVoiceMode) return;
+    const ok = forceEnterListeningIfPossible();
+    if (!ok) return;
     e?.preventDefault?.();
-    speechApi.cancelSpeak();
+    try {
+      speechApi.cancelSpeak();
+    } catch {
+      // noop
+    }
     speechApi.startListening();
   };
 
@@ -414,7 +452,12 @@ function SessionRoomInner() {
   const canUseMicro =
     isVoiceMode &&
     speechState.sttAvailable &&
-    (state.kind === "LISTENING" || state.kind === "EXAMINER_OPENING");
+    (state.kind === "LISTENING" ||
+      state.kind === "EXAMINER_OPENING" ||
+      state.kind === "EXAMINER_TURN" ||
+      state.kind === "THINKING");
+
+  const microButtonDisabled = !isVoiceMode || !speechState.sttAvailable || !canUseMicro;
 
   if (loading || !archetype) {
     return (
@@ -1234,7 +1277,7 @@ function SessionRoomInner() {
                   onContextMenu={(e) => {
                     if (speechState.recordingMode === "ptt") e.preventDefault();
                   }}
-                  disabled={!canUseMicro && !speechState.isListening}
+                  disabled={microButtonDisabled && !speechState.isListening}
                   style={{
                     width: 88,
                     height: 88,
@@ -1262,8 +1305,10 @@ function SessionRoomInner() {
                       : "var(--color-encre-3)",
                     fontSize: 30,
                     cursor:
-                      canUseMicro || speechState.isListening ? "pointer" : "not-allowed",
-                    opacity: canUseMicro || speechState.isListening ? 1 : 0.6,
+                      (canUseMicro || speechState.isListening) && isVoiceMode && speechState.sttAvailable
+                        ? "pointer"
+                        : "not-allowed",
+                    opacity: microButtonDisabled && !speechState.isListening ? 0.55 : 1,
                     transition: "all 0.15s ease",
                     touchAction: "none",
                     userSelect: "none",
@@ -1424,6 +1469,51 @@ function SessionRoomInner() {
                     : "STT indisponible (Chrome/Edge/Safari desktop). Utilisez le textarea ci-dessous."
                   : "Mode texte · réponse par clavier uniquement"}
               </div>
+              {isVoiceMode && speechState.sttAvailable && (
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontSize: 11.5,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        speechApi.resetRecognition();
+                      } catch {
+                        // noop
+                      }
+                      if (
+                        state.kind === "THINKING" ||
+                        state.kind === "EXAMINER_TURN" ||
+                        state.kind === "EXAMINER_OPENING"
+                      ) {
+                        try {
+                          dispatch({ type: "LISTENING_START" });
+                        } catch {
+                          // noop
+                        }
+                      }
+                    }}
+                    style={{
+                      background: "transparent",
+                      color: "#28569E",
+                      border: "none",
+                      padding: 0,
+                      fontSize: 11.5,
+                      fontFamily: "var(--font-mono)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      textDecorationStyle: "dashed",
+                      textUnderlineOffset: 3,
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    ⚠ Micro bloqué ? Réinitialiser la reconnaissance + passer en écoute
+                  </button>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10 }}>
                 <textarea
                   value={textInput}

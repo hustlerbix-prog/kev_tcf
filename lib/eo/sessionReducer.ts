@@ -203,7 +203,8 @@ export function eoSessionReducer(
     case 'LISTENING_START': {
       const canStart =
         current.kind === 'EXAMINER_OPENING' ||
-        current.kind === 'EXAMINER_TURN';
+        current.kind === 'EXAMINER_TURN' ||
+        current.kind === 'THINKING';
       if (!canStart) return current;
       return {
         ...current,
