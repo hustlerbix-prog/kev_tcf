@@ -94,6 +94,7 @@ export function useSpeechIo(
   const isListeningRef = useRef(false);
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | undefined>(undefined);
   const finalBufferRef = useRef<string>("");
+  const explicitStopRequestedRef = useRef(false);
 
   useEffect(() => {
     onFinalTextRef.current = onFinalText;
@@ -184,6 +185,7 @@ export function useSpeechIo(
       rec.onerror = (ev: unknown) => {
         if (cancelled) return;
         stopSilenceTimer();
+        explicitStopRequestedRef.current = true;
         isListeningRef.current = false;
 
         let errCode = "unknown";
@@ -220,7 +222,17 @@ export function useSpeechIo(
             : "";
         const bufferTrimmed = finalRaw.trim();
         const hadFinal = bufferTrimmed.length > 0;
-        isListeningRef.current = false;
+        const mode = recordingModeRef.current;
+        const shouldAutoRestart =
+          (mode === "toggle" || mode === "ptt") &&
+          !explicitStopRequestedRef.current &&
+          !cancelled;
+
+        // If we are auto-restarting (keep mic open forever), do NOT set isListening=false —
+        // keep the visual "ON" state and quickly resume.
+        if (!shouldAutoRestart) {
+          isListeningRef.current = false;
+        }
 
         if (typeof (finalBufferRef as unknown as { current?: string })?.current === "string") {
           (finalBufferRef as unknown as { current: string }).current = "";
@@ -231,7 +243,7 @@ export function useSpeechIo(
           try {
             setState((prev) => ({
               ...prev,
-              isListening: false,
+              isListening: shouldAutoRestart,
               finalTranscript: text,
               partialTranscript: "",
               silenceMs: 0,
@@ -241,6 +253,68 @@ export function useSpeechIo(
           }
           try {
             onFinalTextRef.current?.(text);
+          } catch {
+            // noop
+          }
+
+          if (shouldAutoRestart) {
+            // Kick off recognition again immediately, keep mic open
+            try {
+              silenceStartRef.current = Date.now();
+              setTimeout(() => {
+                if (
+                  cancelled ||
+                  explicitStopRequestedRef.current ||
+                  !recognitionRef.current ||
+                  recordingModeRef.current !== mode
+                ) {
+                  return;
+                }
+                try {
+                  const rec = recognitionRef.current!;
+                  rec.lang = langRef.current;
+                  rec.continuous = mode === "toggle" || mode === "ptt";
+                  silenceStartRef.current = Date.now();
+                  rec.start();
+                  startSilenceTimer(silenceThresholdMs);
+                } catch {
+                  isListeningRef.current = false;
+                  setState((s) => ({ ...s, isListening: false }));
+                }
+              }, 30);
+            } catch {
+              // noop
+            }
+            return;
+          }
+          return;
+        }
+
+        if (shouldAutoRestart) {
+          // Even without text, restart to keep mic on indefinitely until stop click
+          try {
+            setState((prev) => ({ ...prev, isListening: true, partialTranscript: "" }));
+            setTimeout(() => {
+              if (
+                cancelled ||
+                explicitStopRequestedRef.current ||
+                !recognitionRef.current ||
+                recordingModeRef.current !== mode
+              ) {
+                return;
+              }
+              try {
+                const rec = recognitionRef.current!;
+                rec.lang = langRef.current;
+                rec.continuous = mode === "toggle" || mode === "ptt";
+                silenceStartRef.current = Date.now();
+                rec.start();
+                startSilenceTimer(silenceThresholdMs);
+              } catch {
+                isListeningRef.current = false;
+                setState((s) => ({ ...s, isListening: false }));
+              }
+            }, 30);
           } catch {
             // noop
           }
@@ -327,6 +401,19 @@ export function useSpeechIo(
     }
   }, []);
 
+  const stopListeningInternal = useCallback((_triggerFinal: boolean) => {
+    const rec = recognitionRef.current;
+    explicitStopRequestedRef.current = true;
+    isListeningRef.current = false;
+    stopSilenceTimer();
+    try {
+      rec?.stop();
+    } catch {
+      // noop
+    }
+    setState((prev) => ({ ...prev, isListening: false, silenceMs: 0 }));
+  }, [stopSilenceTimer]);
+
   const startSilenceTimer = useCallback(
     (threshold: number) => {
       stopSilenceTimer();
@@ -338,7 +425,12 @@ export function useSpeechIo(
           ...prev,
           silenceMs: mode === "auto" ? Math.min(elapsed, 1800) : 0,
         }));
-        if (mode === "auto" && elapsed >= threshold && isListeningRef.current) {
+        if (
+          mode === "auto" &&
+          elapsed >= threshold &&
+          isListeningRef.current &&
+          !explicitStopRequestedRef.current
+        ) {
           try {
             stopListeningInternal(true);
           } catch {
@@ -348,20 +440,8 @@ export function useSpeechIo(
       }, 100);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [stopSilenceTimer]
+    [stopSilenceTimer, stopListeningInternal]
   );
-
-  const stopListeningInternal = useCallback((_triggerFinal: boolean) => {
-    const rec = recognitionRef.current;
-    isListeningRef.current = false;
-    stopSilenceTimer();
-    try {
-      rec?.stop();
-    } catch {
-      // noop
-    }
-    setState((prev) => ({ ...prev, isListening: false, silenceMs: 0 }));
-  }, [stopSilenceTimer]);
 
   const startListening = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -389,15 +469,21 @@ export function useSpeechIo(
       silenceMs: 0,
     }));
 
+    const mode = recordingModeRef.current;
+    const continuousForMode =
+      mode === "toggle" || mode === "ptt" ? true : continuousRef.current;
+
     try {
+      explicitStopRequestedRef.current = false;
       rec.lang = langRef.current;
-      rec.continuous = continuousRef.current;
+      rec.continuous = continuousForMode;
       isListeningRef.current = true;
       setState((s) => ({ ...s, isListening: true }));
       rec.start();
       startSilenceTimer(silenceThresholdMs);
     } catch {
       isListeningRef.current = false;
+      explicitStopRequestedRef.current = false;
       setState((s) => ({ ...s, isListening: false }));
     }
   }, [silenceThresholdMs, startSilenceTimer]);
