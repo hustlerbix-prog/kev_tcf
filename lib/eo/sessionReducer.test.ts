@@ -34,6 +34,31 @@ test('1. INIT → kind=IDLE, remainingMs=120000', () => {
   assert.equal(state.totalMs, 120000);
   assert.equal(state.prepRemainingMs, 0);
   assert.equal(state.prepTotalMs, 0);
+  assert.equal(state.timerPaused, false);
+});
+
+test('1.bis PAUSE_TIMER / RESUME_TIMER — interdit TICK pendant la pause', () => {
+  const base = applyChain(undefined, [
+    {
+      type: 'INIT',
+      payload: { task: 1, mode: 'drill_text', durationSec: 120, prepSec: 0 },
+    },
+    { type: 'START' },
+  ]);
+  assert.equal(base.timerPaused, false);
+  assert.equal(base.kind, 'EXAMINER_OPENING');
+
+  const paused = eoSessionReducer(base, { type: 'PAUSE_TIMER' });
+  assert.equal(paused.timerPaused, true);
+
+  const noTick = eoSessionReducer(paused, { type: 'TICK', payload: 60000 });
+  assert.equal(noTick.remainingMs, 120000, 'TICK ne doit pas décompter quand PAUSE_TIMER');
+
+  const resumed = eoSessionReducer(paused, { type: 'RESUME_TIMER' });
+  assert.equal(resumed.timerPaused, false);
+
+  const thenTick = eoSessionReducer(resumed, { type: 'TICK', payload: 60000 });
+  assert.equal(thenTick.remainingMs, 60000, 'Après RESUME_TIMER, le TICK redécompte');
 });
 
 test('2. START (no prep) → EXAMINER_OPENING', () => {

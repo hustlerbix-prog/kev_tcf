@@ -21,6 +21,7 @@ export interface SessionState {
   startedAtMs?: number;
   notes?: string;
   conversationTurn: number;
+  timerPaused: boolean;
 }
 
 export type SessionAction =
@@ -47,6 +48,8 @@ export type SessionAction =
   | { type: 'START_EVAL' }
   | { type: 'EVAL_DONE' }
   | { type: 'RESET' }
+  | { type: 'PAUSE_TIMER' }
+  | { type: 'RESUME_TIMER' }
   | { type: 'ERROR'; payload: string };
 
 export function createInitialState(): SessionState {
@@ -60,6 +63,7 @@ export function createInitialState(): SessionState {
     prepTotalMs: 0,
     transcript: [],
     conversationTurn: 0,
+    timerPaused: false,
   };
 }
 
@@ -85,6 +89,8 @@ export function createInitialState(): SessionState {
  * | EVAL_DONE           |  —   |    —     |     —     |      —      |     —     |    —     |     —      |     —     |     ✓      |   —    | → REPORT
  * | RESET               |  ✓   |    ✓     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     ✓     |     ✓      |   ✓    | → IDLE (createInitialState)
  * | ERROR               |  ✓   |    ✓     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     ✓     |     ✓      |   ✓    | champ error=.payload, kind inchangé
+ * | PAUSE_TIMER         |  —   |    —     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     —     |     ✓      |   —    | pose drapeau timerPaused=true; TICK ignorés jusqu'à RESUME
+ * | RESUME_TIMER        |  —   |    —     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     —     |     ✓      |   —    | retire drapeau timerPaused=false; chrono reprend où il était
  *
  * LÉGENDE : ✓ = autorisé / — = ignoré (sans effet, retour de l'état actuel)
  */
@@ -114,6 +120,7 @@ export function eoSessionReducer(
         totalMs,
         prepRemainingMs: prepTotalMs,
         prepTotalMs,
+        timerPaused: false,
       };
     }
 
@@ -136,7 +143,18 @@ export function eoSessionReducer(
       };
     }
 
+    case 'PAUSE_TIMER': {
+      if (current.timerPaused) return current;
+      return { ...current, timerPaused: true };
+    }
+
+    case 'RESUME_TIMER': {
+      if (!current.timerPaused) return current;
+      return { ...current, timerPaused: false };
+    }
+
     case 'TICK': {
+      if (current.timerPaused) return current;
       const elapsed = action.payload;
       if (elapsed <= 0) return current;
 

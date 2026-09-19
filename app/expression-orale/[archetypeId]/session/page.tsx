@@ -105,7 +105,7 @@ function SessionRoomInner() {
 
   const prepTimer = useEoTimer({
     totalMs: state.prepTotalMs,
-    running: state.kind === "PREPARING",
+    running: state.kind === "PREPARING" && !state.timerPaused,
     intervalMs: 250,
     onTick: (ms) => {
       if (state.kind === "PREPARING") {
@@ -117,11 +117,12 @@ function SessionRoomInner() {
   const mainTimer = useEoTimer({
     totalMs: state.totalMs,
     running:
-      state.kind === "EXAMINER_OPENING" ||
-      state.kind === "LISTENING" ||
-      state.kind === "THINKING" ||
-      state.kind === "EXAMINER_TURN" ||
-      state.kind === "EVALUATING",
+      !state.timerPaused &&
+      (state.kind === "EXAMINER_OPENING" ||
+        state.kind === "LISTENING" ||
+        state.kind === "THINKING" ||
+        state.kind === "EXAMINER_TURN" ||
+        state.kind === "EVALUATING"),
     intervalMs: 250,
     onTick: (ms) => {
       const k = state.kind;
@@ -437,6 +438,19 @@ function SessionRoomInner() {
     speechApi.setRecordingMode(m);
   };
 
+  const handleClearAndRetry = () => {
+    speechApi.cancelSpeak();
+    speechApi.discardPending();
+    setTextInput("");
+    setNetworkError(null);
+    if (!isVoiceMode || !speechState.sttAvailable) return;
+    // Give the aborted recognizer a moment to fully end before restarting it.
+    setTimeout(() => {
+      if (!forceEnterListeningIfPossible()) return;
+      speechApi.startListening();
+    }, 300);
+  };
+
   const handleQuitter = () => {
     speechApi.cancelSpeak();
     speechApi.stopListening();
@@ -659,7 +673,123 @@ function SessionRoomInner() {
           >
             {chronoFormatted}
           </div>
-          <div style={{ minWidth: 120 }} />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            {state.timerPaused &&
+              (state.kind === "PREPARING" ||
+                state.kind === "EXAMINER_OPENING" ||
+                state.kind === "LISTENING" ||
+                state.kind === "THINKING" ||
+                state.kind === "EXAMINER_TURN" ||
+                state.kind === "EVALUATING") && (
+                <span
+                  title="Le chronomètre est en pause — temps qui ne décompte pas."
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    padding: "5px 12px",
+                    borderRadius: 999,
+                    background: "rgba(37, 99, 235, 0.10)",
+                    border: "1px solid rgba(37, 99, 235, 0.35)",
+                    color: "#1D4ED8",
+                    fontWeight: 700,
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  ⏸ CHRONO EN PAUSE
+                </span>
+              )}
+            <button
+              onClick={() =>
+                dispatch({ type: state.timerPaused ? "RESUME_TIMER" : "PAUSE_TIMER" })
+              }
+              disabled={
+                state.kind !== "PREPARING" &&
+                state.kind !== "EXAMINER_OPENING" &&
+                state.kind !== "LISTENING" &&
+                state.kind !== "THINKING" &&
+                state.kind !== "EXAMINER_TURN" &&
+                state.kind !== "EVALUATING"
+              }
+              title={
+                state.timerPaused
+                  ? "Reprendre le chronomètre (le temps continue à décompter)"
+                  : "Mettre le chronomètre en pause (interaction reste possible sans décompte)"
+              }
+              style={{
+                padding: "12px 20px",
+                borderRadius: 12,
+                border: "1px solid rgba(0,0,0,0.10)",
+                background: state.timerPaused
+                  ? "rgba(220, 38, 38, 0.06)"
+                  : "rgba(37, 99, 235, 0.06)",
+                color: state.timerPaused ? "#B91C1C" : "#1D4ED8",
+                fontFamily: "var(--font-sans)",
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor:
+                  state.kind === "PREPARING" ||
+                  state.kind === "EXAMINER_OPENING" ||
+                  state.kind === "LISTENING" ||
+                  state.kind === "THINKING" ||
+                  state.kind === "EXAMINER_TURN" ||
+                  state.kind === "EVALUATING"
+                    ? "pointer"
+                    : "not-allowed",
+                opacity:
+                  state.kind === "PREPARING" ||
+                  state.kind === "EXAMINER_OPENING" ||
+                  state.kind === "LISTENING" ||
+                  state.kind === "THINKING" ||
+                  state.kind === "EXAMINER_TURN" ||
+                  state.kind === "EVALUATING"
+                    ? 1
+                    : 0.5,
+              }}
+            >
+              {state.timerPaused ? "▶ Reprendre le chrono" : "⏸ Mettre le chrono en pause"}
+            </button>
+            <button
+              onClick={() => dispatch({ type: "ADVANCE_TASK" })}
+              disabled={
+                state.kind !== "LISTENING" &&
+                state.kind !== "EXAMINER_TURN" &&
+                state.kind !== "THINKING"
+              }
+              title="Terminer la tâche en cours maintenant (avant la fin du chrono)"
+              style={{
+                padding: "12px 20px",
+                borderRadius: 12,
+                border: "1px solid rgba(190, 47, 70, 0.25)",
+                background: "rgba(190, 47, 70, 0.06)",
+                color: "#9F1239",
+                fontFamily: "var(--font-sans)",
+                fontSize: 13.5,
+                fontWeight: 700,
+                cursor:
+                  state.kind === "LISTENING" ||
+                  state.kind === "EXAMINER_TURN" ||
+                  state.kind === "THINKING"
+                    ? "pointer"
+                    : "not-allowed",
+                opacity:
+                  state.kind === "LISTENING" ||
+                  state.kind === "EXAMINER_TURN" ||
+                  state.kind === "THINKING"
+                    ? 1
+                    : 0.5,
+              }}
+            >
+              ⏹ Terminer la tâche
+            </button>
+          </div>
         </div>
 
         {fetchError && (
@@ -1514,6 +1644,26 @@ function SessionRoomInner() {
                   </button>
                 </div>
               )}
+              <div style={{ textAlign: "center", fontSize: 11.5 }}>
+                <button
+                  type="button"
+                  onClick={handleClearAndRetry}
+                  disabled={state.kind !== "LISTENING"}
+                  style={{
+                    background: "transparent",
+                    color: state.kind === "LISTENING" ? "#BE2F46" : "var(--color-encre-3)",
+                    border: "1px solid currentColor",
+                    borderRadius: 999,
+                    padding: "5px 14px",
+                    fontSize: 12,
+                    fontFamily: "var(--font-mono)",
+                    cursor: state.kind === "LISTENING" ? "pointer" : "not-allowed",
+                    opacity: state.kind === "LISTENING" ? 1 : 0.5,
+                  }}
+                >
+                  ↺ Effacer le message et réessayer
+                </button>
+              </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <textarea
                   value={textInput}

@@ -32,6 +32,7 @@ export interface SpeechApi {
   setLang: (l: "fr-CA" | "fr-FR") => void;
   setRecordingMode: (m: RecordingMode) => void;
   resetRecognition: () => void;
+  discardPending: () => void;
   voices: SpeechSynthesisVoice[];
 }
 
@@ -60,6 +61,14 @@ type SpeechRecognitionLike = {
   stop: () => void;
   abort: () => void;
 };
+
+function joinSegments(a: string, b: string): string {
+  const x = a.trim();
+  const y = b.trim();
+  if (!x) return y;
+  if (!y) return x;
+  return `${x} ${y}`;
+}
 
 export function useSpeechIo(
   opts: UseSpeechIoOptions = {}
@@ -94,6 +103,7 @@ export function useSpeechIo(
   const isListeningRef = useRef(false);
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | undefined>(undefined);
   const finalBufferRef = useRef<string>("");
+  const interimRef = useRef<string>("");
   const explicitStopRequestedRef = useRef(false);
 
   useEffect(() => {
@@ -158,22 +168,20 @@ export function useSpeechIo(
         }
 
         if (finalText) {
-          const trimmed = finalText;
-          try {
-            if (typeof (finalBufferRef as unknown as { current: string }).current === "string") {
-              finalBufferRef.current = (finalBufferRef.current ?? "") + trimmed;
-            }
-          } catch {
-            // ignore write errors
+          const seg = finalText.trim();
+          if (seg) {
+            finalBufferRef.current = joinSegments(finalBufferRef.current, seg);
           }
+          interimRef.current = interim.trim();
           setState((prev) => ({
             ...prev,
-            partialTranscript: "",
-            finalTranscript: (prev.finalTranscript + trimmed).trim(),
+            partialTranscript: interim,
+            finalTranscript: finalBufferRef.current,
             silenceMs: 0,
           }));
           silenceStartRef.current = Date.now();
         } else if (interim) {
+          interimRef.current = interim.trim();
           setState((prev) => ({
             ...prev,
             partialTranscript: interim,
@@ -184,9 +192,6 @@ export function useSpeechIo(
 
       rec.onerror = (ev: unknown) => {
         if (cancelled) return;
-        stopSilenceTimer();
-        explicitStopRequestedRef.current = true;
-        isListeningRef.current = false;
 
         let errCode = "unknown";
         try {
@@ -194,6 +199,17 @@ export function useSpeechIo(
         } catch {
           errCode = "unknown";
         }
+
+        // Chrome raises these on brief silence / internal restarts. In manual modes the mic
+        // must stay open, so let onend restart it instead of treating it as a hard stop.
+        const benign = errCode === "no-speech" || errCode === "aborted";
+        const manual =
+          recordingModeRef.current === "toggle" || recordingModeRef.current === "ptt";
+        if (benign && manual && !explicitStopRequestedRef.current) return;
+
+        stopSilenceTimer();
+        explicitStopRequestedRef.current = true;
+        isListeningRef.current = false;
 
         const permissionDenied =
           errCode === "not-allowed" ||
@@ -216,112 +232,70 @@ export function useSpeechIo(
       rec.onend = () => {
         if (cancelled) return;
         stopSilenceTimer();
-        const finalRaw: string =
-          typeof (finalBufferRef as unknown as { current?: string })?.current === "string"
-            ? (finalBufferRef as unknown as { current: string }).current
-            : "";
-        const bufferTrimmed = finalRaw.trim();
-        const hadFinal = bufferTrimmed.length > 0;
         const mode = recordingModeRef.current;
         const shouldAutoRestart =
           (mode === "toggle" || mode === "ptt") &&
           !explicitStopRequestedRef.current &&
           !cancelled;
 
-        // If we are auto-restarting (keep mic open forever), do NOT set isListening=false —
-        // keep the visual "ON" state and quickly resume.
-        if (!shouldAutoRestart) {
-          isListeningRef.current = false;
-        }
-
-        if (typeof (finalBufferRef as unknown as { current?: string })?.current === "string") {
-          (finalBufferRef as unknown as { current: string }).current = "";
-        }
-
-        if (hadFinal) {
-          const text = bufferTrimmed;
-          try {
+        // Chrome ends a session on its own after pauses. In manual modes keep accumulating
+        // and restart; the answer is only sent when the user stops the mic.
+        if (shouldAutoRestart) {
+          if (interimRef.current) {
+            finalBufferRef.current = joinSegments(finalBufferRef.current, interimRef.current);
+            interimRef.current = "";
             setState((prev) => ({
               ...prev,
-              isListening: shouldAutoRestart,
-              finalTranscript: text,
               partialTranscript: "",
-              silenceMs: 0,
+              finalTranscript: finalBufferRef.current,
             }));
-          } catch {
-            // noop
           }
+          setTimeout(() => {
+            if (
+              cancelled ||
+              explicitStopRequestedRef.current ||
+              !recognitionRef.current ||
+              recordingModeRef.current !== mode
+            ) {
+              return;
+            }
+            try {
+              const r = recognitionRef.current;
+              r.lang = langRef.current;
+              r.continuous = true;
+              silenceStartRef.current = Date.now();
+              r.start();
+              startSilenceTimer(silenceThresholdMs);
+            } catch {
+              isListeningRef.current = false;
+              setState((s) => ({ ...s, isListening: false }));
+            }
+          }, 30);
+          return;
+        }
+
+        // Final end: deliver everything captured, including trailing text that never
+        // became "final" (e.g. the last word before stop).
+        const text = joinSegments(finalBufferRef.current, interimRef.current).trim();
+        finalBufferRef.current = "";
+        interimRef.current = "";
+        isListeningRef.current = false;
+
+        setState((prev) => ({
+          ...prev,
+          isListening: false,
+          partialTranscript: "",
+          finalTranscript: text,
+          silenceMs: 0,
+        }));
+
+        if (text) {
           try {
             onFinalTextRef.current?.(text);
           } catch {
             // noop
           }
-
-          if (shouldAutoRestart) {
-            // Kick off recognition again immediately, keep mic open
-            try {
-              silenceStartRef.current = Date.now();
-              setTimeout(() => {
-                if (
-                  cancelled ||
-                  explicitStopRequestedRef.current ||
-                  !recognitionRef.current ||
-                  recordingModeRef.current !== mode
-                ) {
-                  return;
-                }
-                try {
-                  const rec = recognitionRef.current!;
-                  rec.lang = langRef.current;
-                  rec.continuous = mode === "toggle" || mode === "ptt";
-                  silenceStartRef.current = Date.now();
-                  rec.start();
-                  startSilenceTimer(silenceThresholdMs);
-                } catch {
-                  isListeningRef.current = false;
-                  setState((s) => ({ ...s, isListening: false }));
-                }
-              }, 30);
-            } catch {
-              // noop
-            }
-            return;
-          }
-          return;
         }
-
-        if (shouldAutoRestart) {
-          // Even without text, restart to keep mic on indefinitely until stop click
-          try {
-            setState((prev) => ({ ...prev, isListening: true, partialTranscript: "" }));
-            setTimeout(() => {
-              if (
-                cancelled ||
-                explicitStopRequestedRef.current ||
-                !recognitionRef.current ||
-                recordingModeRef.current !== mode
-              ) {
-                return;
-              }
-              try {
-                const rec = recognitionRef.current!;
-                rec.lang = langRef.current;
-                rec.continuous = mode === "toggle" || mode === "ptt";
-                silenceStartRef.current = Date.now();
-                rec.start();
-                startSilenceTimer(silenceThresholdMs);
-              } catch {
-                isListeningRef.current = false;
-                setState((s) => ({ ...s, isListening: false }));
-              }
-            }, 30);
-          } catch {
-            // noop
-          }
-          return;
-        }
-
-        setState((prev) => ({ ...prev, isListening: false, partialTranscript: "" }));
       };
 
       rec.onstart = () => {
@@ -453,14 +427,8 @@ export function useSpeechIo(
     const rec = recognitionRef.current;
     if (!rec) return;
 
-    // Reset final buffer (defensive: ensure ref exists; default to "" if not yet initialized
-    try {
-      if (typeof (finalBufferRef as unknown as { current?: string })?.current === "string") {
-        (finalBufferRef as unknown as { current: string }).current = "";
-      }
-    } catch {
-      // noop
-    }
+    finalBufferRef.current = "";
+    interimRef.current = "";
 
     setState((prev) => ({
       ...prev,
@@ -679,6 +647,29 @@ export function useSpeechIo(
     }
     stopSilenceTimer();
     finalBufferRef.current = "";
+    interimRef.current = "";
+    setState((prev) => ({
+      ...prev,
+      isListening: false,
+      partialTranscript: "",
+      finalTranscript: "",
+      silenceMs: 0,
+    }));
+  }, [stopSilenceTimer]);
+
+  // Drop whatever has been heard but not yet sent, and release the mic without
+  // delivering it (abort() skips the final flush that stop() would trigger).
+  const discardPending = useCallback(() => {
+    explicitStopRequestedRef.current = true;
+    isListeningRef.current = false;
+    stopSilenceTimer();
+    finalBufferRef.current = "";
+    interimRef.current = "";
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      // noop
+    }
     setState((prev) => ({
       ...prev,
       isListening: false,
@@ -696,6 +687,7 @@ export function useSpeechIo(
     setLang,
     setRecordingMode,
     resetRecognition,
+    discardPending,
     voices,
   };
 
