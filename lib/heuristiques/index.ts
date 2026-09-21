@@ -311,7 +311,28 @@ export function nettoyerHeuristiques(
 
 /** Analyse puis nettoie (combinaison courante, retourne la liste "propre") */
 export function analyserPropre(txt: string): ErreurLive[] {
-  return nettoyerHeuristiques(analyser(txt), txt);
+  const heur = nettoyerHeuristiques(analyser(txt), txt);
+  const fromSpell: ErreurLive[] = [];
+  try {
+    // Import paresseux: spellFR.ts contient 1400+ entrées, arbre lourd.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const spell = require("../utils/spellFR") as typeof import("../utils/spellFR");
+    const matches = spell.analyseOrthographe(txt, { includeRule: true });
+    for (const m of matches) {
+      const rule = m.rule ? ` — ${m.rule}` : "";
+      const msg = `Orthographe "${m.wrong}" → correction suggérée : "${m.suggestion}"${rule}`;
+      fromSpell.push({
+        i: m.start,
+        l: m.end - m.start,
+        code: "ORT",
+        g: "haute",
+        msg,
+      });
+    }
+  } catch (_) {
+    /* ignore require SSR failures; if spell module unavailable fall back to heuristics only */
+  }
+  return nettoyerHeuristiques([...heur, ...fromSpell], txt);
 }
 
 export { CONNECTEURS, MARQ_TU, MARQ_VOUS };
