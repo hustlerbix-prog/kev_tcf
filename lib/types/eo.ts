@@ -69,6 +69,9 @@ export interface Turn {
   start_ms: number;
   end_ms: number;
   internal_note?: string;
+  audio_data_base64?: string | null;
+  audio_mime_type?: string | null;
+  duration_sec?: number | null;
 }
 
 export interface SpeechMetrics {

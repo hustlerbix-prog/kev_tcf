@@ -950,6 +950,53 @@ export default function PageRapportSession() {
                         ? highlightTurnText(turn.text, task?.errors ?? [])
                         : turn.text}
                     </div>
+                    {turn.role === "candidate" &&
+                      typeof (turn as { audio_data_base64?: unknown }).audio_data_base64 === "string" &&
+                      (turn as { audio_data_base64: string }).audio_data_base64.length > 0 && (
+                        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 11,
+                              color: "#065F46",
+                              fontWeight: 600,
+                            }}
+                          >
+                            <span>🔊▶ Réponse audio enregistrée</span>
+                            {typeof (turn as { duration_sec?: unknown }).duration_sec === "number" && (
+                              <span
+                                style={{
+                                  padding: "2px 7px",
+                                  borderRadius: 6,
+                                  background: "rgba(16, 185, 129, 0.12)",
+                                  color: "#065F46",
+                                }}
+                              >
+                                {(turn as { duration_sec: number }).duration_sec.toFixed(1)}s
+                              </span>
+                            )}
+                          </div>
+                          <audio
+                            controls
+                            preload="none"
+                            src={`data:${
+                              typeof (turn as { audio_mime_type?: unknown }).audio_mime_type === "string" &&
+                              (turn as { audio_mime_type: string }).audio_mime_type.length > 0
+                                ? (turn as { audio_mime_type: string }).audio_mime_type
+                                : "audio/webm;codecs=opus"
+                            };base64,${(turn as { audio_data_base64: string }).audio_data_base64}`}
+                            style={{
+                              width: "100%",
+                              maxWidth: 480,
+                              height: 36,
+                              borderRadius: 8,
+                            }}
+                          />
+                        </div>
+                      )}
                   </div>
                 ))}
                 {!taskRun?.turns?.length && (

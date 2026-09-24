@@ -32,7 +32,10 @@ export async function GET(_req: Request, { params }: SessionParams) {
             text,
             start_ms,
             end_ms,
-            internal_note
+            internal_note,
+            audio_data_base64,
+            audio_mime_type,
+            duration_sec
           )
         )
       `

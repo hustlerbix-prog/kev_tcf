@@ -41,7 +41,7 @@ export type SessionAction =
   | { type: 'EXAMINER_SPEAK'; payload: Turn }
   | { type: 'EXAMINER_DONE_SPEAKING' }
   | { type: 'LISTENING_START' }
-  | { type: 'CANDIDATE_TEXT'; payload: { text: string; endMs?: number } }
+  | { type: 'CANDIDATE_TEXT'; payload: { text: string; endMs?: number; audio_data_base64?: string | null; audio_mime_type?: string | null; duration_sec?: number | null } }
   | { type: 'THINKING' }
   | { type: 'ADVANCE_TASK' }
   | { type: 'TASK_COMPLETE' }
@@ -232,7 +232,7 @@ export function eoSessionReducer(
 
     case 'CANDIDATE_TEXT': {
       if (current.kind !== 'LISTENING') return current;
-      const { text, endMs } = action.payload;
+      const { text, endMs, audio_data_base64, audio_mime_type, duration_sec } = action.payload;
       const lastTurn = current.transcript[current.transcript.length - 1];
       const startMs = lastTurn ? lastTurn.end_ms : 0;
       const turn: Turn = {
@@ -240,6 +240,9 @@ export function eoSessionReducer(
         text,
         start_ms: startMs,
         end_ms: endMs ?? startMs,
+        audio_data_base64,
+        audio_mime_type,
+        duration_sec,
       };
       return {
         ...current,

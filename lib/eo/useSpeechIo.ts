@@ -4,6 +4,37 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type RecordingMode = "auto" | "toggle" | "ptt";
 
+export type VoiceBufferEventType =
+  | "started"
+  | "stopped"
+  | "voice_start"
+  | "voice_end"
+  | "silence_timeout"
+  | "turn_committed";
+
+export interface VoiceBufferTurn {
+  blob: Blob;
+  mime: string;
+  durationMs: number;
+  startedAtMs: number;
+  committedAtMs: number;
+  bytes: number;
+  peakRmsDb: number;
+}
+
+export interface VoiceBufferState {
+  recorderAvailable: boolean;
+  vadAvailable: boolean;
+  isRecording: boolean;
+  vadSpeaking: boolean;
+  silenceMs: number;
+  recordingMs: number;
+  currentBlobBytes: number;
+  lastTurn: VoiceBufferTurn | null;
+  turnCount: number;
+  peakRmsDb: number;
+}
+
 export interface SpeechState {
   ttsAvailable: boolean;
   sttAvailable: boolean;
@@ -15,6 +46,7 @@ export interface SpeechState {
   finalTranscript: string;
   silenceMs: number;
   recordingMode: RecordingMode;
+  voice: VoiceBufferState;
 }
 
 export interface SpeechApi {
@@ -34,6 +66,17 @@ export interface SpeechApi {
   resetRecognition: () => void;
   discardPending: () => void;
   voices: SpeechSynthesisVoice[];
+  startRecording: (opts?: { autoVadCommitMs?: number }) => Promise<{
+    ok: boolean;
+    error?: string;
+    streamId?: string;
+  }>;
+  stopRecording: (opts?: { commit: boolean }) => Promise<{
+    committed: VoiceBufferTurn | null;
+    ok: boolean;
+    error?: string;
+  }>;
+  discardCurrentRecording: () => void;
 }
 
 interface UseSpeechIoOptions {
@@ -75,6 +118,19 @@ export function useSpeechIo(
 ): [SpeechState, SpeechApi] {
   const { onFinalText, silenceThresholdMs = 1800, continuous = false } = opts;
 
+  const DEFAULT_VOICE: VoiceBufferState = {
+    recorderAvailable: false,
+    vadAvailable: false,
+    isRecording: false,
+    vadSpeaking: false,
+    silenceMs: 0,
+    recordingMs: 0,
+    currentBlobBytes: 0,
+    lastTurn: null,
+    turnCount: 0,
+    peakRmsDb: -Infinity,
+  };
+
   const [state, setState] = useState<SpeechState>({
     ttsAvailable: false,
     sttAvailable: false,
@@ -85,6 +141,7 @@ export function useSpeechIo(
     finalTranscript: "",
     silenceMs: 0,
     recordingMode: "auto",
+    voice: DEFAULT_VOICE,
   });
 
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -105,6 +162,35 @@ export function useSpeechIo(
   const finalBufferRef = useRef<string>("");
   const interimRef = useRef<string>("");
   const explicitStopRequestedRef = useRef(false);
+
+  // ====== VoiceBuffer refs ======
+  const vbStreamRef = useRef<MediaStream | null>(null);
+  const vbRecorderRef = useRef<MediaRecorder | null>(null);
+  const vbChunksRef = useRef<BlobPart[]>([]);
+  const vbMimeRef = useRef<string>("audio/webm;codecs=opus");
+  const vbStartRef = useRef<number>(0);
+  const vbCommitAtRef = useRef<number>(0);
+  const vbStartedRef = useRef<boolean>(false);
+  const vbAutoCommitMsRef = useRef<number>(1500);
+  const vbVadSpeakingRef = useRef<boolean>(false);
+  const vbSilenceStartTsRef = useRef<number>(0);
+  const vbAudioCtxRef = useRef<AudioContext | null>(null);
+  const vbAnalyserRef = useRef<AnalyserNode | null>(null);
+  const vbSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const vbVadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const vbPeakRef = useRef<number>(-Infinity);
+  const vbPendingBytesEstimateRef = useRef<number>(0);
+  const vbTurnCountRef = useRef<number>(0);
+  const vbLastTurnRef = useRef<VoiceBufferTurn | null>(null);
+  const vbSubscribersRef = useRef<
+    Partial<
+      Record<
+        VoiceBufferEventType,
+        Set<(turn?: VoiceBufferTurn) => void>
+      >
+    >
+  >({});
+  const vbRecordingMsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     onFinalTextRef.current = onFinalText;
@@ -679,6 +765,454 @@ export function useSpeechIo(
     }));
   }, [stopSilenceTimer]);
 
+  // ======================================================================
+  // VoiceBuffer: MediaRecorder + AnalyserNode VAD silence detection
+  // ======================================================================
+
+  const vbPatchState = useCallback(
+    (patch: Partial<VoiceBufferState> | ((prev: VoiceBufferState) => VoiceBufferState)) => {
+      setState((prev) => {
+        const nextVoice = typeof patch === "function" ? patch(prev.voice) : { ...prev.voice, ...patch };
+        if (
+          Object.keys(patch as Record<string, unknown>).length > 0 &&
+          JSON.stringify(nextVoice) === JSON.stringify(prev.voice)
+        ) {
+          return prev;
+        }
+        return { ...prev, voice: nextVoice };
+      });
+    },
+    []
+  );
+
+  const vbFire = useCallback((event: VoiceBufferEventType, turn?: VoiceBufferTurn) => {
+    const set = vbSubscribersRef.current[event];
+    if (set && set.size > 0) {
+      for (const fn of set) {
+        try {
+          fn(turn);
+        } catch {
+          /* noop */
+        }
+      }
+    }
+  }, []);
+
+  const vbStopAnalyser = useCallback(() => {
+    try {
+      if (vbVadIntervalRef.current) {
+        clearInterval(vbVadIntervalRef.current);
+        vbVadIntervalRef.current = null;
+      }
+    } catch {
+      /* noop */
+    }
+    try {
+      if (vbRecordingMsIntervalRef.current) {
+        clearInterval(vbRecordingMsIntervalRef.current);
+        vbRecordingMsIntervalRef.current = null;
+      }
+    } catch {
+      /* noop */
+    }
+    try {
+      vbSourceRef.current?.disconnect?.();
+    } catch {
+      /* noop */
+    }
+    vbSourceRef.current = null;
+    vbAnalyserRef.current = null;
+  }, []);
+
+  const vbCleanStream = useCallback(() => {
+    vbStopAnalyser();
+    try {
+      if (vbRecorderRef.current && vbRecorderRef.current.state !== "inactive") {
+        try {
+          vbRecorderRef.current.onstop = null as unknown as (() => void) | null;
+          vbRecorderRef.current.ondataavailable = null as unknown as ((ev: BlobEvent) => void) | null;
+          vbRecorderRef.current.onerror = null as unknown as ((ev: Event) => void) | null;
+          vbRecorderRef.current.stop();
+        } catch {
+          /* noop */
+        }
+      }
+    } catch {
+      /* noop */
+    }
+    vbRecorderRef.current = null;
+    vbStreamRef.current?.getTracks().forEach((t) => {
+      try {
+        t.stop();
+      } catch {
+        /* noop */
+      }
+    });
+    vbStreamRef.current = null;
+    vbChunksRef.current = [];
+    vbStartedRef.current = false;
+    vbPendingBytesEstimateRef.current = 0;
+    vbVadSpeakingRef.current = false;
+    vbSilenceStartTsRef.current = 0;
+    vbPeakRef.current = -Infinity;
+  }, [vbStopAnalyser]);
+
+  const vbCommitTurn = useCallback(async (opts?: { fromVadTimeout?: boolean }): Promise<VoiceBufferTurn | null> => {
+    const started = vbStartRef.current;
+    const streamId = vbStreamRef.current?.id;
+    if (!vbStartedRef.current || !streamId) return null;
+    const committedAt = performance.now();
+    vbStartRef.current = 0;
+    vbStartedRef.current = false;
+    const mime = vbMimeRef.current || "audio/webm";
+    const peakRmsDb = vbPeakRef.current;
+    const chunks = vbChunksRef.current.slice();
+    vbChunksRef.current = [];
+    vbPeakRef.current = -Infinity;
+    let blob: Blob;
+    try {
+      blob = new Blob(chunks, { type: mime });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn("[useSpeechIo:VoiceBuffer] Blob construction failed:", msg);
+      return null;
+    }
+    const turn: VoiceBufferTurn = {
+      blob,
+      mime,
+      durationMs: Math.max(0, Math.round(committedAt - started)),
+      startedAtMs: started,
+      committedAtMs: committedAt,
+      bytes: blob.size,
+      peakRmsDb: Number.isFinite(peakRmsDb) ? peakRmsDb : -Infinity,
+    };
+    vbLastTurnRef.current = turn;
+    vbTurnCountRef.current += 1;
+    vbPatchState((prev) => ({
+      ...prev,
+      isRecording: false,
+      recordingMs: 0,
+      currentBlobBytes: 0,
+      silenceMs: 0,
+      vadSpeaking: false,
+      turnCount: vbTurnCountRef.current,
+      lastTurn: turn,
+      peakRmsDb: Number.isFinite(peakRmsDb) ? peakRmsDb : -Infinity,
+    }));
+    vbCleanStream();
+    vbFire(opts?.fromVadTimeout ? "silence_timeout" : "turn_committed", turn);
+    vbFire("turn_committed", turn);
+    return turn;
+  }, [vbCleanStream, vbFire, vbPatchState]);
+
+  const vbStartAnalyser = useCallback(
+    (stream: MediaStream) => {
+      type WinWithAudio = Window & {
+        AudioContext?: typeof AudioContext;
+        webkitAudioContext?: typeof AudioContext;
+      };
+      const win = typeof window !== "undefined"
+        ? (window as WinWithAudio)
+        : null;
+      const AC = win ? (win.AudioContext || win.webkitAudioContext) : undefined;
+      if (!AC) {
+        vbPatchState((p) => ({ ...p, vadAvailable: false }));
+        return;
+      }
+      try {
+        const ctx = new AC();
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.35;
+        const src = ctx.createMediaStreamSource(stream);
+        src.connect(analyser);
+        vbAudioCtxRef.current = ctx;
+        vbAnalyserRef.current = analyser;
+        vbSourceRef.current = src;
+        vbPatchState((p) => ({ ...p, vadAvailable: true }));
+
+        const buf = new Float32Array(analyser.fftSize);
+        vbVadSpeakingRef.current = false;
+        vbSilenceStartTsRef.current = performance.now();
+        vbPeakRef.current = -Infinity;
+
+        const TICK_MS = 48;
+        // RMS thresholds empirically OK for a headset mic ~ 5-10 cm.
+        const SPEAKING_RMS = 0.035;     // above → speech
+        const SILENCE_RMS = 0.018;       // below → silence (hysteresis)
+        if (vbVadIntervalRef.current) clearInterval(vbVadIntervalRef.current);
+        vbVadIntervalRef.current = setInterval(() => {
+          if (!vbStartedRef.current || !vbAnalyserRef.current) return;
+          try {
+            vbAnalyserRef.current.getFloatTimeDomainData(buf);
+            let sum = 0;
+            for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+            const rms = Math.sqrt(sum / Math.max(1, buf.length));
+            const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+            if (Number.isFinite(db) && db > vbPeakRef.current) vbPeakRef.current = db;
+            const currentlySpeaking = vbVadSpeakingRef.current
+              ? rms >= SILENCE_RMS
+              : rms >= SPEAKING_RMS;
+            if (currentlySpeaking !== vbVadSpeakingRef.current) {
+              vbVadSpeakingRef.current = currentlySpeaking;
+              vbPatchState((p) => ({ ...p, vadSpeaking: currentlySpeaking }));
+              vbFire(currentlySpeaking ? "voice_start" : "voice_end");
+            }
+            if (!currentlySpeaking) {
+              const since = performance.now() - vbSilenceStartTsRef.current;
+              vbPatchState((p) => (p.silenceMs === since ? p : { ...p, silenceMs: since }));
+              const timeout = vbAutoCommitMsRef.current;
+              if (timeout > 0 && since >= timeout) {
+                // VAD-based turn commit (auto mode): commit then release,
+                // parent room page will restart if continuous multi-turn mode.
+                // To avoid double-stop: only stop recorder if currently
+                // recording with auto mode.
+                if (vbStartedRef.current) {
+                  const committingTurn: VoiceBufferTurn = (async () => {
+                    try {
+                      if (
+                        vbRecorderRef.current &&
+                        vbRecorderRef.current.state === "recording"
+                      ) {
+                        explicitStopRequestedRef.current = false;
+                        vbRecorderRef.current.stop();
+                      }
+                    } catch {
+                      /* noop */
+                    }
+                    // Wait for recorder onstop → will resolve inside commitTurn
+                    return await vbCommitTurn({ fromVadTimeout: true });
+                  })() as unknown as VoiceBufferTurn;
+                  void committingTurn;
+                  return;
+                }
+              }
+            } else {
+              // Speech resumed → reset silence timer
+              vbSilenceStartTsRef.current = performance.now();
+              vbPatchState((p) => (p.silenceMs === 0 ? p : { ...p, silenceMs: 0 }));
+            }
+          } catch {
+            /* noop */
+          }
+        }, TICK_MS);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn("[useSpeechIo:VoiceBuffer] AnalyserNode init failed:", msg);
+        vbPatchState((p) => ({ ...p, vadAvailable: false }));
+      }
+    },
+    [vbCommitTurn, vbFire, vbPatchState]
+  );
+
+  const startRecording = useCallback<SpeechApi["startRecording"]>(
+    async (opts = {}) => {
+      const hasMR =
+        typeof window !== "undefined" &&
+        typeof navigator !== "undefined" &&
+        typeof navigator.mediaDevices?.getUserMedia === "function" &&
+        typeof (window as unknown as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder === "function";
+      if (!hasMR) {
+        return { ok: false, error: "MediaRecorder non supporté par ce navigateur." };
+      }
+      if (vbStartedRef.current) {
+        return { ok: false, error: "Enregistrement déjà en cours." };
+      }
+      vbAutoCommitMsRef.current = typeof opts.autoVadCommitMs === "number" ? opts.autoVadCommitMs : 1500;
+      vbPatchState((p) => ({ ...p, recorderAvailable: true }));
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+            channelCount: 1,
+          },
+          video: false,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        vbPatchState((p) => ({ ...p, recorderAvailable: false }));
+        return {
+          ok: false,
+          error: `Accès au micro refusé ou indisponible : ${msg}`,
+        };
+      }
+      vbStreamRef.current = stream;
+      const MRCtor = (window as unknown as { MediaRecorder: typeof MediaRecorder }).MediaRecorder;
+      // choose mimeType wisely (Opus = excellent speech, low bitrate)
+      let chosenMime = "audio/webm;codecs=opus";
+      const candidateMimes: string[] = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+      ];
+      for (const m of candidateMimes) {
+        try {
+          if (typeof (MRCtor as typeof MediaRecorder & { isTypeSupported?: (t: string) => boolean }).isTypeSupported === "function") {
+            if ((MRCtor as typeof MediaRecorder & { isTypeSupported: (t: string) => boolean }).isTypeSupported(m)) {
+              chosenMime = m;
+              break;
+            }
+          }
+        } catch {
+          /* noop */
+        }
+      }
+      vbMimeRef.current = chosenMime;
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MRCtor(stream, { mimeType: chosenMime, audioBitsPerSecond: 64_000 });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        vbCleanStream();
+        return {
+          ok: false,
+          error: `MediaRecorder non initialisable sur ce navigateur : ${msg}`,
+        };
+      }
+      vbRecorderRef.current = recorder;
+      vbChunksRef.current = [];
+      vbPendingBytesEstimateRef.current = 0;
+      const startedAt = performance.now();
+      vbStartRef.current = startedAt;
+      vbSilenceStartTsRef.current = startedAt;
+      vbRecorderRef.current.ondataavailable = (ev: BlobEvent) => {
+        if (!ev.data || ev.data.size === 0) return;
+        vbChunksRef.current.push(ev.data);
+        vbPendingBytesEstimateRef.current += ev.data.size;
+        vbPatchState((p) =>
+          p.currentBlobBytes === vbPendingBytesEstimateRef.current
+            ? p
+            : { ...p, currentBlobBytes: vbPendingBytesEstimateRef.current }
+        );
+      };
+      vbRecorderRef.current.onstop = async () => {
+        // Ensure a final commit at stop() time (always, even no data)
+        if (vbStartedRef.current) {
+          await vbCommitTurn();
+        }
+      };
+      vbRecorderRef.current.onerror = (ev) => {
+        console.warn("[useSpeechIo:VoiceBuffer] recorder.onerror:", ev);
+      };
+      try {
+        // Emit data chunks every ~250ms so blob size updates regularly even for long recordings
+        vbRecorderRef.current.start(250);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        vbCleanStream();
+        return { ok: false, error: `Impossible de démarrer l'enregistrement : ${msg}` };
+      }
+      vbStartedRef.current = true;
+      vbPatchState({
+        isRecording: true,
+        recordingMs: 0,
+        silenceMs: 0,
+        vadSpeaking: false,
+        currentBlobBytes: 0,
+        peakRmsDb: -Infinity,
+        lastTurn: vbLastTurnRef.current,
+        turnCount: vbTurnCountRef.current,
+        recorderAvailable: true,
+      });
+      vbRecordingMsIntervalRef.current = setInterval(() => {
+        if (!vbStartedRef.current) return;
+        const ms = Math.max(0, Math.round(performance.now() - vbStartRef.current));
+        vbPatchState((p) => (p.recordingMs === ms ? p : { ...p, recordingMs: ms }));
+      }, 100);
+      vbStartAnalyser(stream);
+      vbFire("started");
+      return { ok: true, streamId: stream.id };
+    },
+    [vbCleanStream, vbCommitTurn, vbFire, vbPatchState, vbStartAnalyser]
+  );
+
+  const stopRecording = useCallback<SpeechApi["stopRecording"]>(
+    async (opts = { commit: true }) => {
+      if (!vbStartedRef.current && !vbStreamRef.current) {
+        return { ok: false, committed: null, error: "Aucun enregistrement en cours." };
+      }
+      try {
+        if (opts.commit) {
+          explicitStopRequestedRef.current = false;
+          // Stop recorder → triggers onstop → vbCommitTurn inside that handler → set vbStartedRef = false
+          if (
+            vbRecorderRef.current &&
+            vbRecorderRef.current.state === "recording"
+          ) {
+            vbRecorderRef.current.stop();
+          }
+          // Wait recorder to actually stop then return the committed turn
+          const deadline = performance.now() + 2500;
+          while (vbStartedRef.current && performance.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 20));
+          }
+          const last = vbLastTurnRef.current;
+          vbCleanStream();
+          return { ok: true, committed: last ?? null };
+        } else {
+          // Discard the current recording (no commit)
+          vbStartRef.current = 0;
+          vbStartedRef.current = false;
+          vbChunksRef.current = [];
+          vbCleanStream();
+          vbPatchState({
+            isRecording: false,
+            recordingMs: 0,
+            silenceMs: 0,
+            vadSpeaking: false,
+            currentBlobBytes: 0,
+          });
+          vbFire("stopped");
+          return { ok: true, committed: null };
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        vbCleanStream();
+        return { ok: false, committed: null, error: msg };
+      }
+    },
+    [vbCleanStream, vbFire, vbPatchState]
+  );
+
+  const discardCurrentRecording = useCallback(() => {
+    void stopRecording({ commit: false });
+  }, [stopRecording]);
+
+  const RECORDER_AVAILABLE =
+    typeof window !== "undefined" &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getUserMedia === "function" &&
+    typeof (window as unknown as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder === "function";
+
+  // initial availability (first run)
+  useEffect(() => {
+    vbPatchState((p) => {
+      if (p.recorderAvailable === !!RECORDER_AVAILABLE) return p;
+      return { ...p, recorderAvailable: !!RECORDER_AVAILABLE };
+    });
+    // cleanup on unmount: stop any pending recorder
+    return () => {
+      try {
+        vbCleanStream();
+      } catch {
+        /* noop */
+      }
+      try {
+        if (vbAudioCtxRef.current && typeof vbAudioCtxRef.current.close === "function") {
+          void vbAudioCtxRef.current.close?.().catch(() => {});
+        }
+      } catch {
+        /* noop */
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const api: SpeechApi = {
     startListening,
     stopListening,
@@ -689,6 +1223,9 @@ export function useSpeechIo(
     resetRecognition,
     discardPending,
     voices,
+    startRecording,
+    stopRecording,
+    discardCurrentRecording,
   };
 
   return [state, api];

@@ -82,6 +82,8 @@ function SessionRoomInner() {
   const [notes, setNotes] = useState("");
   const [textInput, setTextInput] = useState("");
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const examinerTurnRef = useRef<Promise<unknown> | null>(null);
 
@@ -286,13 +288,20 @@ function SessionRoomInner() {
     handleExaminerResponseRef.current = handleExaminerResponse;
   }, [handleExaminerResponse]);
 
-  const runExaminerTurn = async (candidateText?: string) => {
+  const runExaminerTurn = async (
+    candidateText?: string,
+    audioFields?: {
+      audio_data_base64?: string;
+      audio_mime_type?: string;
+      duration_sec?: number;
+    }
+  ) => {
     if (!archetype) return;
 
     if (candidateText) {
       dispatch({
         type: "CANDIDATE_TEXT",
-        payload: { text: candidateText },
+        payload: { text: candidateText, ...audioFields },
       });
     }
 
@@ -302,7 +311,7 @@ function SessionRoomInner() {
     const transcriptSnapshot = candidateText
       ? [
           ...state.transcript,
-          { role: "candidate" as const, text: candidateText },
+          { role: "candidate" as const, text: candidateText, ...audioFields },
         ]
       : state.transcript;
 
@@ -384,28 +393,206 @@ function SessionRoomInner() {
     }
   };
 
-  const toggleMicro = () => {
+  const pttStop = (e?: React.SyntheticEvent) => {
+    if (speechState.recordingMode !== "ptt") return;
+    if (!speechState.voice.isRecording) return;
+    e?.preventDefault?.();
+    void commitRecordingAndTranscribe();
+  };
+
+  async function blobToBase64(blob: Blob): Promise<string> {
+    const reader = new FileReader();
+    return new Promise<string>((resolve, reject) => {
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        const i = dataUrl.indexOf(",");
+        resolve(i >= 0 ? dataUrl.slice(i + 1) : dataUrl);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error("FileReader error"));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function transcribeBlob(
+    blob: Blob,
+    mime: string,
+    durationMs: number
+  ): Promise<{ text: string; base64: string; mime: string; durationSec: number }> {
+    setIsTranscribing(true);
+    setTranscribeError(null);
+    const base64 = await blobToBase64(blob);
+    try {
+      const fd = new FormData();
+      fd.set("audio", blob, `turn_${Date.now()}.webm`);
+      fd.set("mimeType", mime || "audio/webm;codecs=opus");
+      fd.set("filename", `turn_${Date.now()}.webm`);
+      const res = await fetch("/api/eo/transcribe", {
+        method: "POST",
+        body: fd,
+      });
+      let payload: unknown = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || !payload || typeof payload !== "object") {
+        const msg =
+          (payload && typeof payload === "object" && "error" in payload && (payload as { error?: { message?: string } }).error?.message) ||
+          (payload && typeof payload === "object" && "message" in payload && String((payload as { message?: unknown }).message ?? "")) ||
+          `HTTP ${res.status} — transcription indisponible`;
+        throw new Error(String(msg));
+      }
+      const { transcription } = payload as {
+        ok: boolean;
+        transcription: string;
+        language?: string;
+        duration_sec?: number;
+        bytes?: number;
+      };
+      const text = String(transcription || "").trim();
+      return {
+        text,
+        base64,
+        mime,
+        durationSec: (payload as { duration_sec?: number }).duration_sec && Number.isFinite((payload as { duration_sec?: number }).duration_sec)
+          ? Math.round(((payload as { duration_sec: number }).duration_sec as number) * 100) / 100
+          : Math.round((durationMs / 1000) * 100) / 100,
+      };
+    } finally {
+      setIsTranscribing(false);
+    }
+  }
+
+  async function commitRecordingAndTranscribe() {
+    if (!speechState.voice.isRecording) return;
+    const stopped = await speechApi.stopRecording({ commit: true });
+    if (!stopped.ok || !stopped.committed) {
+      if (stopped.error) {
+        setTranscribeError(`⚠ Arrêt enregistrement : ${stopped.error}`);
+      }
+      return;
+    }
+    const turn = stopped.committed;
+    if (turn.bytes < 2048 || turn.durationMs < 600) {
+      // Very short / no data: ignore, silently skip
+      setTranscribeError(null);
+      return;
+    }
+    try {
+      const { text, base64, mime, durationSec } = await transcribeBlob(
+        turn.blob,
+        turn.mime,
+        turn.durationMs
+      );
+      if (!text) {
+        setTranscribeError(
+          "Transcription vide. Parlez plus fort / plus près du micro, ou utilisez la saisie texte."
+        );
+        return;
+      }
+      setTranscribeError(null);
+      handleCandidateTurnWithAudio(text, {
+        audio_data_base64: base64,
+        audio_mime_type: mime,
+        duration_sec: durationSec,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setTranscribeError(`⚠ Transcription échouée : ${msg} · En attente saisie texte.`);
+    }
+  }
+
+  const handleCandidateTurnWithAudio = (
+    text: string,
+    audioFields?: {
+      audio_data_base64?: string;
+      audio_mime_type?: string;
+      duration_sec?: number;
+    }
+  ) => {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) return;
+    if (state.kind !== "LISTENING") return;
+    // We will attach audio data directly inside the Turn when dispatching CANDIDATE_TEXT.
+    // Extend the payload with audio fields; the reducer stores `text` in run.turns later.
+    void runExaminerTurn(trimmed, audioFields);
+  };
+
+  // When Whisper-based voice buffer auto-commits a turn due to 1.5s silence (VAD auto mode):
+  // subscribe to lastTurn change. Effect will start a NEW recording immediately if kind === LISTENING (multi-turn conversation mode).
+  useEffect(() => {
+    const lastTurn = speechState.voice.lastTurn;
+    if (!lastTurn) return;
+    // Don't re-trigger on subsequent renders; only when lastTurn object changes identity (new turn).
+  }, [speechState.voice.lastTurn]);
+
+  const setRecordingModeStable = (m: RecordingMode) => {
+    if (speechState.recordingMode === m) return;
+    // When switching mode while recording/listening, stop first to release cleanly.
+    if (speechState.voice.isRecording) {
+      void commitRecordingAndTranscribe();
+    }
+    if (speechState.isListening) {
+      try {
+        speechApi.stopListening();
+      } catch {
+        /* noop */
+      }
+    }
+    speechApi.setRecordingMode(m);
+  };
+
+  async function startNewTurnRecording(opts?: { autoVadCommitMs?: number }) {
+    if (speechState.voice.isRecording) return;
+    const started = await speechApi.startRecording({
+      autoVadCommitMs:
+        typeof opts?.autoVadCommitMs === "number" ? opts.autoVadCommitMs : speechState.recordingMode === "toggle" ? 0 : 1500,
+    });
+    if (!started.ok) {
+      setTranscribeError(`⚠ Micro: ${started.error ?? "indisponible"}`);
+    }
+  }
+
+  const toggleMicro = async () => {
+    // VoiceBuffer MediaRecorder takes priority over Chrome STT if available.
+    const canUseRecorder = isVoiceMode && speechState.voice.recorderAvailable;
+    if (canUseRecorder && speechState.voice.isRecording) {
+      await commitRecordingAndTranscribe();
+      return;
+    }
     if (speechState.isListening) {
       speechApi.stopListening();
       return;
     }
     if (!isVoiceMode) return;
     const ok = forceEnterListeningIfPossible();
-    if (!ok) {
-      // Kind like TASK_COMPLETE/EVALUATING/REPORT/PREPARING/IDLE — ignore; button will be visually disabled
-      return;
-    }
+    if (!ok) return;
     try {
       speechApi.cancelSpeak();
     } catch {
-      // noop
+      /* noop */
     }
+    if (canUseRecorder) {
+      // Toggle ON / PTT held / Auto via VoiceBuffer
+      if (speechState.recordingMode === "ptt") {
+        await startNewTurnRecording({ autoVadCommitMs: 0 });
+      } else if (speechState.recordingMode === "toggle") {
+        // Toggle: record continuously until user clicks STOP. No auto VAD commit.
+        await startNewTurnRecording({ autoVadCommitMs: 0 });
+      } else {
+        // Auto mode (default): record, and VAD will auto-commit after 1.5s silence. Then we restart for next turn.
+        await startNewTurnRecording({ autoVadCommitMs: 1500 });
+      }
+      return;
+    }
+    // Fallback: old-style Web Speech Recognition STT (no buffer / no Whisper)
     speechApi.startListening();
   };
 
-  const pttStart = (e?: React.SyntheticEvent) => {
+  const pttStart = async (e?: React.SyntheticEvent) => {
     if (speechState.recordingMode !== "ptt") return;
-    if (speechState.isListening) return;
+    if (speechState.voice.isRecording || speechState.isListening) return;
     if (!isVoiceMode) return;
     const ok = forceEnterListeningIfPossible();
     if (!ok) return;
@@ -413,30 +600,47 @@ function SessionRoomInner() {
     try {
       speechApi.cancelSpeak();
     } catch {
-      // noop
+      /* noop */
     }
-    speechApi.startListening();
+    if (speechState.voice.recorderAvailable) {
+      await startNewTurnRecording({ autoVadCommitMs: 0 });
+    } else {
+      speechApi.startListening();
+    }
   };
 
-  const pttStop = (e?: React.SyntheticEvent) => {
-    if (speechState.recordingMode !== "ptt") return;
-    if (!speechState.isListening) return;
-    e?.preventDefault?.();
-    speechApi.stopListening();
-  };
-
-  const setRecordingModeStable = (m: RecordingMode) => {
-    if (speechState.recordingMode === m) return;
-    // When switching mode while listening, stop first to release the mic with the correct silence semantics
-    if (speechState.isListening) {
-      try {
-        speechApi.stopListening();
-      } catch {
-        // noop
-      }
+  // Auto-VAD turn commit subscriber: whenever a VAD silence commit happens (silence_timeout event),
+  // we restart recording IMMEDIATELY to keep conversation flowing continuously (multi-turn).
+  useEffect(() => {
+    const voiceState = speechState.voice;
+    if (
+      // Recording just ended (lastTurn changed AND isRecording === false AND kind LISTENING
+      // AND we were in AUTO mode → need to restart for next turn
+      !voiceState.isRecording &&
+      voiceState.lastTurn &&
+      state.kind === "LISTENING" &&
+      speechState.recordingMode !== "ptt" &&
+      speechState.recordingMode !== "toggle" &&
+      voiceState.recorderAvailable &&
+      !isTranscribing &&
+      voiceState.turnCount > 0
+    ) {
+      // Restart ONLY if we haven't already queued a pending transcription dispatch: once the transcription runs, it'll go to THINKING/EXAMINER_TURN anyway. We restart just to "warm up" the microphone for the NEXT candidate turn after examiner finishes.
+      // Actually better NOT to re-start here (the examiner will speak for the next ~4-10s, don't waste bandwidth). Keep turned off; restart explicit on EXAMINER_DONE_SPEAKING → LISTENING transition.
     }
-    speechApi.setRecordingMode(m);
-  };
+  }, [speechState.voice, state.kind, speechState.recordingMode, isTranscribing]);
+
+  // When session state transitions to LISTENING (after examiner speaks), auto-start the microphone if user is in voice mode (conversational "keep mic on" behaviour). We do this ONLY in Auto recording mode; Toggle and PTT require user action.
+  useEffect(() => {
+    if (!isVoiceMode || !speechState.voice.recorderAvailable) return;
+    if (state.kind !== "LISTENING") return;
+    if (speechState.voice.isRecording) return;
+    if (isTranscribing) return;
+    if (speechState.recordingMode !== "auto") return;
+    // Start immediately (micro ON, examinateur done, à ton tour de parler)
+    void startNewTurnRecording({ autoVadCommitMs: 1500 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.kind]);
 
   const handleClearAndRetry = () => {
     speechApi.cancelSpeak();
