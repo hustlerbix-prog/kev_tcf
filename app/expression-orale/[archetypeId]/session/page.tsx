@@ -647,11 +647,16 @@ function SessionRoomInner() {
     speechApi.discardPending();
     setTextInput("");
     setNetworkError(null);
-    if (!isVoiceMode || !speechState.sttAvailable) return;
+    const hasAnyVoice = speechState.sttAvailable || speechState.voice.recorderAvailable;
+    if (!isVoiceMode || !hasAnyVoice) return;
     // Give the aborted recognizer a moment to fully end before restarting it.
     setTimeout(() => {
       if (!forceEnterListeningIfPossible()) return;
-      speechApi.startListening();
+      if (speechState.voice.recorderAvailable) {
+        void startNewTurnRecording({ autoVadCommitMs: 0 });
+      } else {
+        speechApi.startListening();
+      }
     }, 300);
   };
 
@@ -667,15 +672,18 @@ function SessionRoomInner() {
   const isLast15s =
     state.kind === "PREPARING" ? prepTimer.isLast15s : mainTimer.isLast15s;
 
+  const hasAnyVoicePath =
+    speechState.sttAvailable || speechState.voice.recorderAvailable;
+
   const canUseMicro =
     isVoiceMode &&
-    speechState.sttAvailable &&
+    hasAnyVoicePath &&
     (state.kind === "LISTENING" ||
       state.kind === "EXAMINER_OPENING" ||
       state.kind === "EXAMINER_TURN" ||
       state.kind === "THINKING");
 
-  const microButtonDisabled = !isVoiceMode || !speechState.sttAvailable || !canUseMicro;
+  const microButtonDisabled = !isVoiceMode || !hasAnyVoicePath || !canUseMicro;
 
   if (loading || !archetype) {
     return (
@@ -841,7 +849,7 @@ function SessionRoomInner() {
                 Préparation: {formatPrepDuration(archetype.prep_sec)}
               </span>
             )}
-            {isVoiceMode && !speechState.sttAvailable && (
+            {isVoiceMode && !speechState.sttAvailable && !speechState.voice.recorderAvailable && (
               <span
                 style={{
                   fontFamily: "var(--font-mono)",
@@ -853,7 +861,7 @@ function SessionRoomInner() {
                   color: "#BE2F46",
                   fontWeight: 600,
                 }}
-                title="Reconnaissance vocale non disponible sur ce navigateur (préférez Chrome/Edge/Safari macOS)"
+                title="Aucune reconnaissance vocale disponible (MediaRecorder + SpeechRecognition absents). Préférez Chrome/Edge/Safari macOS 15+."
               >
                 ⚠ STT indisponible
               </span>
@@ -1549,7 +1557,7 @@ function SessionRoomInner() {
                 background: "rgba(0,0,0,0.02)",
               }}
             >
-              {isVoiceMode && speechState.sttAvailable && (
+              {isVoiceMode && (speechState.sttAvailable || speechState.voice.recorderAvailable) && (
                 <div
                   style={{
                     display: "flex",
@@ -1563,10 +1571,10 @@ function SessionRoomInner() {
                     const active = speechState.recordingMode === m;
                     const label =
                       m === "auto"
-                        ? "Auto (1,8s silence)"
+                        ? "Auto · silence 1,5s"
                         : m === "toggle"
-                        ? "Cliquer pour On / Off"
-                        : "Maintenir pour parler";
+                        ? "Toggle · On / Off"
+                        : "PTT · Maintenir";
                     return (
                       <button
                         key={m}
@@ -1603,7 +1611,7 @@ function SessionRoomInner() {
                   onPointerDown={pttStart}
                   onPointerUp={pttStop}
                   onPointerLeave={(e) => {
-                    if (speechState.recordingMode === "ptt" && speechState.isListening) pttStop(e);
+                    if (speechState.recordingMode === "ptt" && (speechState.isListening || speechState.voice.isRecording)) pttStop(e);
                   }}
                   onPointerCancel={(e) => {
                     if (speechState.recordingMode === "ptt") pttStop(e);
@@ -1611,26 +1619,26 @@ function SessionRoomInner() {
                   onContextMenu={(e) => {
                     if (speechState.recordingMode === "ptt") e.preventDefault();
                   }}
-                  disabled={microButtonDisabled && !speechState.isListening}
+                  disabled={microButtonDisabled && !speechState.isListening && !speechState.voice.isRecording}
                   style={{
                     width: 88,
                     height: 88,
                     borderRadius: "50%",
-                    background: speechState.isListening
+                    background: (speechState.isListening || speechState.voice.isRecording)
                       ? speechState.recordingMode === "ptt"
                         ? "rgba(37, 111, 81, 0.22)"
                         : "rgba(190, 47, 70, 0.15)"
                       : canUseMicro
                       ? "rgba(37, 111, 81, 0.10)"
                       : "rgba(0,0,0,0.06)",
-                    border: speechState.isListening
+                    border: (speechState.isListening || speechState.voice.isRecording)
                       ? speechState.recordingMode === "ptt"
                         ? "3px solid #256F51"
                         : "3px solid #BE2F46"
                       : canUseMicro
                       ? "2px solid rgba(37, 111, 81, 0.45)"
                       : "2px dashed rgba(0,0,0,0.2)",
-                    color: speechState.isListening
+                    color: (speechState.isListening || speechState.voice.isRecording)
                       ? speechState.recordingMode === "ptt"
                         ? "#256F51"
                         : "#BE2F46"
@@ -1639,10 +1647,10 @@ function SessionRoomInner() {
                       : "var(--color-encre-3)",
                     fontSize: 30,
                     cursor:
-                      (canUseMicro || speechState.isListening) && isVoiceMode && speechState.sttAvailable
+                      (canUseMicro || speechState.isListening || speechState.voice.isRecording) && isVoiceMode && hasAnyVoicePath
                         ? "pointer"
                         : "not-allowed",
-                    opacity: microButtonDisabled && !speechState.isListening ? 0.55 : 1,
+                    opacity: microButtonDisabled && !speechState.isListening && !speechState.voice.isRecording ? 0.55 : 1,
                     transition: "all 0.15s ease",
                     touchAction: "none",
                     userSelect: "none",
@@ -1650,19 +1658,19 @@ function SessionRoomInner() {
                   }}
                   title={(() => {
                     const m = speechState.recordingMode;
-                    if (speechState.isListening) {
+                    if (speechState.isListening || speechState.voice.isRecording) {
                       return m === "toggle"
                         ? "⏹ Cliquer pour arrêter"
                         : m === "ptt"
                         ? "Relâcher pour arrêter"
-                        : "⏹ Arrêter ou attendre 1,8s de silence";
+                        : "⏹ Arrêter ou attendre 1,5s de silence";
                     }
                     if (canUseMicro) {
                       return m === "toggle"
                         ? "🎙 Cliquer pour commencer"
                         : m === "ptt"
                         ? "🎙 Maintenir enfoncé pour parler"
-                        : "🎙 Cliquer puis parler (1,8s silence = fin)";
+                        : "🎙 Cliquer puis parler (1,5s silence = fin)";
                     }
                     if (isVoiceMode) {
                       return "Micro désactivé (STT non dispo / attente tour)";
@@ -1670,7 +1678,7 @@ function SessionRoomInner() {
                     return "Mode texte uniquement — ?mode=drill_voice dans l'URL";
                   })()}
                 >
-                  {speechState.isListening
+                  {(speechState.isListening || speechState.voice.isRecording)
                     ? speechState.recordingMode === "ptt"
                       ? "🎙"
                       : "⏹"
@@ -1686,7 +1694,7 @@ function SessionRoomInner() {
                     minWidth: 220,
                   }}
                 >
-                  {speechState.isListening ? (
+                  {speechState.isListening || speechState.voice.isRecording ? (
                     <>
                       <div
                         style={{
@@ -1699,7 +1707,9 @@ function SessionRoomInner() {
                         }}
                       >
                         {speechState.recordingMode === "auto"
-                          ? "ENREGISTREMENT AUTO"
+                          ? speechState.voice.isRecording
+                            ? "🎙 ENREGISTREMENT · VoiceBuffer + Whisper"
+                            : "ENREGISTREMENT AUTO"
                           : speechState.recordingMode === "toggle"
                           ? "ENREGISTREMENT · CLIQUER ⏹ POUR STOP"
                           : "ENREGISTREMENT · RELÂCHER BOUTON POUR STOP"}
@@ -1718,16 +1728,21 @@ function SessionRoomInner() {
                             <div
                               style={{
                                 height: "100%",
-                                width: `${Math.min(
-                                  100,
-                                  (speechState.silenceMs / 1800) * 100
-                                )}%`,
-                                background:
-                                  speechState.silenceMs > 1200
-                                    ? "#BE2F46"
-                                    : speechState.silenceMs > 600
-                                    ? "#F59E0B"
-                                    : "#256F51",
+                                width: `${(() => {
+                                  if (speechState.voice.isRecording) {
+                                    return Math.min(100, (speechState.voice.silenceMs / 1500) * 100);
+                                  }
+                                  return Math.min(100, (speechState.silenceMs / 1800) * 100);
+                                })()}%`,
+                                background: (() => {
+                                  const ms = speechState.voice.isRecording
+                                    ? speechState.voice.silenceMs
+                                    : speechState.silenceMs;
+                                  const threshold = speechState.voice.isRecording ? 1500 : 1800;
+                                  if (ms > threshold * 0.8) return "#BE2F46";
+                                  if (ms > threshold * 0.4) return "#F59E0B";
+                                  return "#256F51";
+                                })(),
                                 transition: "width 0.1s linear",
                               }}
                             />
@@ -1739,7 +1754,15 @@ function SessionRoomInner() {
                               color: "var(--color-encre-3)",
                             }}
                           >
-                            silence: {(speechState.silenceMs / 1000).toFixed(1)}s / 1.8s
+                            {speechState.voice.isRecording ? (
+                              <>
+                                silence: {(speechState.voice.silenceMs / 1000).toFixed(1)}s / 1.5s ·
+                                🎙 {(speechState.voice.recordingMs / 1000).toFixed(1)}s ·
+                                {Math.round(speechState.voice.currentBlobBytes / 1024)} ko
+                              </>
+                            ) : (
+                              <>silence: {(speechState.silenceMs / 1000).toFixed(1)}s / 1.8s</>
+                            )}
                           </div>
                         </>
                       )}
@@ -1757,7 +1780,7 @@ function SessionRoomInner() {
                       >
                         {!isVoiceMode
                           ? "MODE TEXTE"
-                          : !speechState.sttAvailable
+                          : !speechState.sttAvailable && !speechState.voice.recorderAvailable
                           ? "STT INDISPONIBLE"
                           : !canUseMicro
                           ? "ATTENTE DU TOUR…"
@@ -1774,11 +1797,11 @@ function SessionRoomInner() {
                           color: "var(--color-encre-3)",
                         }}
                       >
-                        {isVoiceMode && speechState.sttAvailable
+                        {isVoiceMode && (speechState.sttAvailable || speechState.voice.recorderAvailable)
                           ? speechState.recordingMode === "auto"
-                            ? "Fin automatique après 1,8s de silence"
+                            ? "Fin automatique après 1,5s de silence (enregistrement voix + Whisper)"
                             : speechState.recordingMode === "toggle"
-                            ? "Un clic ON / un clic OFF — pas d'arrêt automatique"
+                            ? "Un clic ON / un clic OFF — enregistrement continu"
                             : "Enregistre seulement tant que le bouton est enfoncé"
                           : "Utiliser le textarea ci-dessous"}
                       </div>
@@ -1796,14 +1819,14 @@ function SessionRoomInner() {
                 }}
               >
                 {isVoiceMode
-                  ? speechState.sttAvailable
-                    ? `Micro ${speechState.lang} · voix: ${speechState.selectedVoice || "système"} · ${
-                        speechState.isSpeaking ? "🔊 TTS en cours" : "prêt"
+                  ? speechState.sttAvailable || speechState.voice.recorderAvailable
+                    ? `Voix FR · Whisper serveur · ${speechState.voice.recorderAvailable ? "VoiceBuffer" : "Chrome STT"} · ${
+                        speechState.isSpeaking ? "🔊 Examinateur parle" : speechState.voice.isRecording ? "🎙 Enregistrement…" : "prêt"
                       }`
-                    : "STT indisponible (Chrome/Edge/Safari desktop). Utilisez le textarea ci-dessous."
+                    : "STT indisponible (MediaRecorder + SpeechRecognition absents). Utilisez le textarea ci-dessous."
                   : "Mode texte · réponse par clavier uniquement"}
               </div>
-              {isVoiceMode && speechState.sttAvailable && (
+              {isVoiceMode && (speechState.sttAvailable || speechState.voice.recorderAvailable) && (
                 <div
                   style={{
                     textAlign: "center",
@@ -1815,6 +1838,11 @@ function SessionRoomInner() {
                     onClick={() => {
                       try {
                         speechApi.resetRecognition();
+                      } catch {
+                        // noop
+                      }
+                      try {
+                        speechApi.discardCurrentRecording?.();
                       } catch {
                         // noop
                       }
@@ -1844,7 +1872,7 @@ function SessionRoomInner() {
                       letterSpacing: "0.02em",
                     }}
                   >
-                    ⚠ Micro bloqué ? Réinitialiser la reconnaissance + passer en écoute
+                    ⚠ Micro bloqué ? Réinitialiser + passer en écoute
                   </button>
                 </div>
               )}

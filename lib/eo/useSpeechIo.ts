@@ -222,6 +222,21 @@ export function useSpeechIo(
     const sttAvail = !!SR;
     const ttsAvail = typeof window.speechSynthesis !== "undefined";
 
+    type WinWithMedia = Window & {
+      MediaRecorder?: typeof MediaRecorder;
+      AudioContext?: typeof AudioContext;
+      webkitAudioContext?: typeof AudioContext;
+    };
+    const w = window as WinWithMedia;
+    const recorderAvail =
+      typeof navigator !== "undefined" &&
+      typeof navigator.mediaDevices !== "undefined" &&
+      typeof navigator.mediaDevices.getUserMedia === "function" &&
+      typeof w.MediaRecorder === "function";
+    const audioCtxCtor: (typeof AudioContext) | undefined =
+      w.AudioContext || w.webkitAudioContext;
+    const vadAvail = recorderAvail && typeof audioCtxCtor === "function";
+
     const initialLang: "fr-CA" | "fr-FR" = "fr-CA";
     langRef.current = initialLang;
 
@@ -230,6 +245,11 @@ export function useSpeechIo(
       sttAvailable: sttAvail,
       ttsAvailable: ttsAvail,
       lang: initialLang,
+      voice: {
+        ...prev.voice,
+        recorderAvailable: recorderAvail,
+        vadAvailable: vadAvail,
+      },
     }));
 
     if (sttAvail && SR) {
