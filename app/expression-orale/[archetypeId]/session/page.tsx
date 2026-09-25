@@ -86,6 +86,8 @@ function SessionRoomInner() {
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const examinerTurnRef = useRef<Promise<unknown> | null>(null);
+  const processedTurnCommittedAtRef = useRef<number>(0);
+  const turnTranscriptionInFlightRef = useRef<boolean>(false);
 
   const mode: ModeId = archetypeId === "FULL-EXAM" ? "full_exam" : modeParam;
   const isVoiceMode = mode === "drill_voice" || mode === "conversation" || mode === "full_exam";
@@ -465,41 +467,9 @@ function SessionRoomInner() {
   }
 
   async function commitRecordingAndTranscribe() {
-    if (!speechState.voice.isRecording) return;
     const stopped = await speechApi.stopRecording({ commit: true });
-    if (!stopped.ok || !stopped.committed) {
-      if (stopped.error) {
-        setTranscribeError(`⚠ Arrêt enregistrement : ${stopped.error}`);
-      }
-      return;
-    }
-    const turn = stopped.committed;
-    if (turn.bytes < 2048 || turn.durationMs < 600) {
-      // Very short / no data: ignore, silently skip
-      setTranscribeError(null);
-      return;
-    }
-    try {
-      const { text, base64, mime, durationSec } = await transcribeBlob(
-        turn.blob,
-        turn.mime,
-        turn.durationMs
-      );
-      if (!text) {
-        setTranscribeError(
-          "Transcription vide. Parlez plus fort / plus près du micro, ou utilisez la saisie texte."
-        );
-        return;
-      }
-      setTranscribeError(null);
-      handleCandidateTurnWithAudio(text, {
-        audio_data_base64: base64,
-        audio_mime_type: mime,
-        duration_sec: durationSec,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setTranscribeError(`⚠ Transcription échouée : ${msg} · En attente saisie texte.`);
+    if (!stopped.ok && stopped.error) {
+      setTranscribeError(`⚠ Arrêt enregistrement : ${stopped.error}`);
     }
   }
 
@@ -514,22 +484,74 @@ function SessionRoomInner() {
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
     if (state.kind !== "LISTENING") return;
-    // We will attach audio data directly inside the Turn when dispatching CANDIDATE_TEXT.
-    // Extend the payload with audio fields; the reducer stores `text` in run.turns later.
     void runExaminerTurn(trimmed, audioFields);
   };
 
-  // When Whisper-based voice buffer auto-commits a turn due to 1.5s silence (VAD auto mode):
-  // subscribe to lastTurn change. Effect will start a NEW recording immediately if kind === LISTENING (multi-turn conversation mode).
+  // Unified voice-turn handler: runs whenever VoiceBuffer produces a NEW committed turn
+  // (auto-VAD silence commit, Toggle stop, PTT release). Uses refs to guard against double-dispatch.
   useEffect(() => {
     const lastTurn = speechState.voice.lastTurn;
     if (!lastTurn) return;
-    // Don't re-trigger on subsequent renders; only when lastTurn object changes identity (new turn).
-  }, [speechState.voice.lastTurn]);
+    if (turnTranscriptionInFlightRef.current) return;
+    if (lastTurn.committedAtMs === 0) return;
+    if (lastTurn.committedAtMs <= processedTurnCommittedAtRef.current) return;
+    if (state.kind !== "LISTENING") return;
+
+    turnTranscriptionInFlightRef.current = true;
+    processedTurnCommittedAtRef.current = lastTurn.committedAtMs;
+
+    if (lastTurn.bytes < 2048 || lastTurn.durationMs < 600) {
+      setTranscribeError(
+        `Réponse trop courte (${(lastTurn.durationMs / 1000).toFixed(1)}s · ${lastTurn.bytes}o). Réessayez ou utilisez la saisie texte Fallback.`
+      );
+      turnTranscriptionInFlightRef.current = false;
+      return;
+    }
+
+    let cancelled = false;
+    setIsTranscribing(true);
+    setTranscribeError(null);
+
+    void (async () => {
+      try {
+        const { text, base64, mime, durationSec } = await transcribeBlob(
+          lastTurn.blob,
+          lastTurn.mime,
+          lastTurn.durationMs
+        );
+        if (cancelled) return;
+        if (!text || text.trim().length === 0) {
+          setTranscribeError(
+            "Transcription vide. Parlez plus fort / plus près du micro, ou utilisez la saisie texte."
+          );
+          return;
+        }
+        setTranscribeError(null);
+        handleCandidateTurnWithAudio(text.trim(), {
+          audio_data_base64: base64,
+          audio_mime_type: mime,
+          duration_sec: durationSec,
+        });
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        setTranscribeError(`⚠ Transcription échouée : ${msg} · En attente saisie texte.`);
+      } finally {
+        if (!cancelled) {
+          setIsTranscribing(false);
+        }
+        turnTranscriptionInFlightRef.current = false;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      turnTranscriptionInFlightRef.current = false;
+    };
+  }, [speechState.voice.lastTurn, state.kind]);
 
   const setRecordingModeStable = (m: RecordingMode) => {
     if (speechState.recordingMode === m) return;
-    // When switching mode while recording/listening, stop first to release cleanly.
     if (speechState.voice.isRecording) {
       void commitRecordingAndTranscribe();
     }
