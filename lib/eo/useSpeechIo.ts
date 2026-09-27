@@ -1168,9 +1168,12 @@ export function useSpeechIo(
           }
           // Wait recorder to actually stop then return the committed turn
           const deadline = performance.now() + 2500;
+          let waitIters = 0;
           while (vbStartedRef.current && performance.now() < deadline) {
+            waitIters += 1;
             await new Promise((r) => setTimeout(r, 20));
           }
+          const timedOut = vbStartedRef.current;
           const last = vbLastTurnRef.current;
           vbCleanStream();
           return { ok: true, committed: last ?? null };

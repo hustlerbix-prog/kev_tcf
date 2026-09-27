@@ -7,6 +7,7 @@ import { examinerSystems, repairExaminerJson } from "@/lib/llm/examinerPrompts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 interface ExaminerTurnRequest {
   task: 1 | 2 | 3;
@@ -14,6 +15,7 @@ interface ExaminerTurnRequest {
     id?: string;
     consigne?: string;
     question_ouverture?: string | null;
+    relances?: string[] | null;
     required_moves?: string[] | null;
     examiner_role?: string | null;
     scene_facts?: string[] | null;
@@ -46,6 +48,7 @@ export async function POST(req: Request) {
   const examinerRole =
     body.archetype?.examiner_role?.trim() || "Examinateur neutre";
   const questionOuverture = body.archetype?.question_ouverture?.trim();
+  const relances = Array.isArray(body.archetype?.relances) ? body.archetype!.relances! : [];
   const requiredMoves = body.archetype?.required_moves || [];
   const sceneFacts = body.archetype?.scene_facts || [];
   const complication = body.archetype?.complication?.trim();
@@ -57,6 +60,12 @@ export async function POST(req: Request) {
   const extraContextParts: string[] = [];
   if (questionOuverture) {
     extraContextParts.push(`QUESTION_OUVERTURE:\n${questionOuverture}`);
+  }
+  if (relances.length > 0) {
+    extraContextParts.push(
+      `RELANCES_TCF_OFFICIELLES (pour la relance APRÈS la 1ère réponse candidat — utiliser strictement RELANCES_TCF_OFFICIELLES[0] sauf si 1 déjà utilisée précédemment, puis next) :\n` +
+        relances.map((r, i) => `  ${i + 1}. ${r}`).join("\n")
+    );
   }
   if (requiredMoves && requiredMoves.length > 0) {
     extraContextParts.push(

@@ -78,7 +78,7 @@ export function createInitialState(): SessionState {
  * | START               |  ✓   |    —     |     —     |      —      |     —     |    —     |     —      |     —     |     —      |   —    | → PREPARING si prepTotalMs>0 sinon EXAMINER_OPENING
  * | PREP_DONE           |  —   |    —     |     ✓     |      —      |     —     |    —     |     —      |     —     |     —      |   —    | → EXAMINER_OPENING
  * | TICK                |  —   |    —     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     —     |     ✓      |   —    | décrémente; PREPARING→EXAMINER_OP si prep==0; LISTENING/EXAMINER_T→TASK_COMPLETE si remaining==0
- * | EXAMINER_SPEAK      |  —   |    —     |     —     |      ✓      |     ✓     |    —     |     ✓      |     —     |     —      |   —    | push turn → EXAMINER_TURN
+ * | EXAMINER_SPEAK      |  —   |    —     |     —     |      ✓      |     ✓     |    ✓     |     ✓      |     —     |     —      |   —    | push turn → EXAMINER_TURN
  * | EXAMINER_DONE_SPK   |  —   |    —     |     —     |      —      |     —     |    —     |     ✓      |     —     |     —      |   —    | → LISTENING
  * | LISTENING_START     |  —   |    —     |     —     |      ✓      |     —     |    —     |     ✓      |     —     |     —      |   —    | → LISTENING
  * | CANDIDATE_TEXT      |  —   |    —     |     —     |      —      |     ✓     |    —     |     —      |     —     |     —      |   —    | push turn, kind LISTENING
@@ -88,7 +88,7 @@ export function createInitialState(): SessionState {
  * | START_EVAL          |  —   |    —     |     —     |      —      |     —     |    —     |     —      |     ✓     |     —      |   —    | → EVALUATING
  * | EVAL_DONE           |  —   |    —     |     —     |      —      |     —     |    —     |     —      |     —     |     ✓      |   —    | → REPORT
  * | RESET               |  ✓   |    ✓     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     ✓     |     ✓      |   ✓    | → IDLE (createInitialState)
- * | ERROR               |  ✓   |    ✓     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     ✓     |     ✓      |   ✓    | champ error=.payload, kind inchangé
+ * | ERROR               |  ✓   |    ✓     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     ✓     |     ✓      |   ✓    | champ error=.payload; kind inchangé sauf EVALUATING→TASK_COMPLETE (sinon bloqué)
  * | PAUSE_TIMER         |  —   |    —     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     —     |     ✓      |   —    | pose drapeau timerPaused=true; TICK ignorés jusqu'à RESUME
  * | RESUME_TIMER        |  —   |    —     |     ✓     |      ✓      |     ✓     |    ✓     |     ✓      |     —     |     ✓      |   —    | retire drapeau timerPaused=false; chrono reprend où il était
  *
@@ -201,7 +201,8 @@ export function eoSessionReducer(
       const canSpeak =
         current.kind === 'EXAMINER_OPENING' ||
         current.kind === 'LISTENING' ||
-        current.kind === 'EXAMINER_TURN';
+        current.kind === 'EXAMINER_TURN' ||
+        current.kind === 'THINKING';
       if (!canSpeak) return current;
       return {
         ...current,
@@ -299,8 +300,13 @@ export function eoSessionReducer(
     }
 
     case 'ERROR': {
+      // EVALUATING has no other way out: a failed evaluation call must drop
+      // the user back to TASK_COMPLETE (where the eval button is reachable
+      // again) instead of leaving them on the spinner forever.
+      const kind = current.kind === 'EVALUATING' ? 'TASK_COMPLETE' : current.kind;
       return {
         ...current,
+        kind,
         error: action.payload,
       };
     }

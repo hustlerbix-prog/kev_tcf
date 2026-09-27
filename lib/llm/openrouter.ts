@@ -115,11 +115,25 @@ export async function appelOpenRouter(
   };
 
   const fetchOne = async (body: Record<string, unknown>): Promise<{ brut: string; r: Response; d: OpenRouterResponse }> => {
-    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const to = setTimeout(() => controller.abort(), 55_000);
+    let r: Response;
+    try {
+      r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const timedOut = msg.toLowerCase().includes("abort");
+      throw new Error(
+        timedOut ? "OpenRouter a mis trop de temps à répondre (>55s)." : "Erreur réseau OpenRouter : " + msg
+      );
+    } finally {
+      clearTimeout(to);
+    }
     const brut = await r.text();
     let d: OpenRouterResponse;
     try {

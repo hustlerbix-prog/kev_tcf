@@ -144,6 +144,41 @@ test('5. EXAMINER_SPEAK + EXAMINER_DONE_SPEAKING → transcript.length=1, LISTEN
   assert.equal(state.kind, 'LISTENING');
 });
 
+test('5b. Follow-up turn: LISTENING → CANDIDATE_TEXT → THINKING → EXAMINER_SPEAK must land (regression: THINKING was missing from canSpeak, silently dropping every real follow-up reply)', () => {
+  const opening: Turn = {
+    role: 'examiner',
+    text: 'Bonjour, parlez-moi de vous.',
+    start_ms: 0,
+    end_ms: 5000,
+  };
+  const followUp: Turn = {
+    role: 'examiner',
+    text: 'Merci, pouvez-vous préciser ?',
+    start_ms: 5000,
+    end_ms: 10000,
+  };
+  const state = applyChain(undefined, [
+    {
+      type: 'INIT',
+      payload: {
+        task: 1,
+        mode: 'drill_text',
+        durationSec: 120,
+        prepSec: 0,
+      },
+    },
+    { type: 'START' },
+    { type: 'EXAMINER_SPEAK', payload: opening },
+    { type: 'EXAMINER_DONE_SPEAKING' },
+    { type: 'CANDIDATE_TEXT', payload: { text: 'Je m\'appelle Marie.' } },
+    { type: 'THINKING' },
+    { type: 'EXAMINER_SPEAK', payload: followUp },
+  ]);
+  assert.equal(state.kind, 'EXAMINER_TURN');
+  assert.equal(state.transcript.length, 3);
+  assert.equal(state.transcript[2]!.text, followUp.text);
+});
+
 test('6. LISTENING + remainingMs 0 via TICK → TASK_COMPLETE', () => {
   const state = applyChain(undefined, [
     {
@@ -212,6 +247,27 @@ test('bonus: ERROR préserve le kind et remplit error', () => {
   ]);
   assert.equal(state.error, 'oups réseau');
   assert.equal(state.kind, 'EXAMINER_OPENING');
+});
+
+test("bonus: ERROR pendant EVALUATING renvoie à TASK_COMPLETE (pas bloqué)", () => {
+  const state = applyChain(undefined, [
+    {
+      type: 'INIT',
+      payload: {
+        task: 1,
+        mode: 'conversation',
+        durationSec: 60,
+        prepSec: 0,
+      },
+    },
+    { type: 'START' },
+    { type: 'LISTENING_START' },
+    { type: 'ADVANCE_TASK' },
+    { type: 'START_EVAL' },
+    { type: 'ERROR', payload: 'évaluation échouée' },
+  ]);
+  assert.equal(state.kind, 'TASK_COMPLETE');
+  assert.equal(state.error, 'évaluation échouée');
 });
 
 test('bonus: RESET retourne à IDLE', () => {

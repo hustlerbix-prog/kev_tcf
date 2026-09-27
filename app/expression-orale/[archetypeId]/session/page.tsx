@@ -86,16 +86,16 @@ function SessionRoomInner() {
   const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const examinerTurnRef = useRef<Promise<unknown> | null>(null);
+  const examinerTurnGenerationRef = useRef<number>(0);
+  const examinerTurnAbortRef = useRef<AbortController | null>(null);
   const processedTurnCommittedAtRef = useRef<number>(0);
   const turnTranscriptionInFlightRef = useRef<boolean>(false);
+  const autoEvalInFlightRef = useRef<boolean>(false);
 
   const mode: ModeId = archetypeId === "FULL-EXAM" ? "full_exam" : modeParam;
   const isVoiceMode = mode === "drill_voice" || mode === "conversation" || mode === "full_exam";
 
   const handleCandidateTurnRef = useRef<(text: string) => void>(() => {});
-  const handleExaminerResponseRef = useRef<(r: ExaminerTurnResult) => Promise<void>>(
-    async () => {}
-  );
 
   const [speechState, speechApi] = useSpeechIo({
     onFinalText: (text) => {
@@ -214,7 +214,8 @@ function SessionRoomInner() {
   const fetchExaminerTurn = async (
     task: 1 | 2 | 3,
     archetypeData: Archetype,
-    transcriptArr: Turn[]
+    transcriptArr: Turn[],
+    signal?: AbortSignal
   ): Promise<ExaminerTurnResult> => {
     const trimmedTranscript = transcriptArr.slice(-8).map((t) => ({
       role: t.role as "examiner" | "candidate",
@@ -230,6 +231,7 @@ function SessionRoomInner() {
           id: archetypeData.id,
           consigne: archetypeData.consigne,
           question_ouverture: archetypeData.question_ouverture ?? null,
+          relances: (archetypeData.relances as string[] | null | undefined) ?? null,
           required_moves: archetypeData.required_moves ?? null,
           examiner_role: archetypeData.examiner_role ?? null,
           scene_facts: archetypeData.scene_facts ?? null,
@@ -239,6 +241,7 @@ function SessionRoomInner() {
         },
         transcript: trimmedTranscript,
       }),
+      signal,
     });
 
     if (!res.ok) {
@@ -255,7 +258,13 @@ function SessionRoomInner() {
     return (await res.json()) as ExaminerTurnResult;
   };
 
-  const handleExaminerResponse = async (result: ExaminerTurnResult) => {
+  const handleExaminerResponse = async (result: ExaminerTurnResult, generation: number) => {
+    if (examinerTurnGenerationRef.current !== generation) {
+      // Superseded by a barge-in (or reset) while this response was in
+      // flight — applying it now would speak/insert an out-of-order
+      // examiner turn over the candidate's live answer. Drop it silently.
+      return;
+    }
     const lastTurn = state.transcript[state.transcript.length - 1];
     const startMs = lastTurn ? lastTurn.end_ms : 0;
     const endMs = startMs + result.speech.length * 80;
@@ -283,12 +292,15 @@ function SessionRoomInner() {
 
     if (result.shouldAdvance) {
       dispatch({ type: "ADVANCE_TASK" });
+    } else if (archetype && archetype.task === 1) {
+      const candidateTurnCount = state.transcript.filter(
+        (t) => t.role === "candidate"
+      ).length;
+      if (candidateTurnCount >= 2) {
+        dispatch({ type: "ADVANCE_TASK" });
+      }
     }
   };
-
-  useEffect(() => {
-    handleExaminerResponseRef.current = handleExaminerResponse;
-  }, [handleExaminerResponse]);
 
   const runExaminerTurn = async (
     candidateText?: string,
@@ -310,6 +322,10 @@ function SessionRoomInner() {
     dispatch({ type: "THINKING" });
     setNetworkError(null);
 
+    const generation = ++examinerTurnGenerationRef.current;
+    const controller = new AbortController();
+    examinerTurnAbortRef.current = controller;
+
     const transcriptSnapshot = candidateText
       ? [
           ...state.transcript,
@@ -324,16 +340,24 @@ function SessionRoomInner() {
         transcriptSnapshot.map((t) => ({
           role: t.role as "examiner" | "candidate",
           text: t.text,
-        })) as Turn[]
+        })) as Turn[],
+        controller.signal
       );
       examinerTurnRef.current = p;
       const result = await p;
-      await handleExaminerResponse(result);
+      await handleExaminerResponse(result, generation);
     } catch (e) {
+      if (examinerTurnGenerationRef.current !== generation) {
+        // Aborted because the user barged in — not a real error.
+        return;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       setNetworkError(`⚠ Erreur examinateur: ${msg}`);
       dispatch({ type: "ERROR", payload: `Réseau: ${msg}` });
     } finally {
+      if (examinerTurnAbortRef.current === controller) {
+        examinerTurnAbortRef.current = null;
+      }
       examinerTurnRef.current = null;
     }
   };
@@ -374,10 +398,13 @@ function SessionRoomInner() {
       case "THINKING":
         if (state.kind !== "LISTENING") {
           try {
-            // If an examiner-turn request was already in flight, cancel its network effect best-effort:
-            // dispatch LISTENING_START first. If we're inside THINKING, we can't cancel the in-flight
-            // fetch but on completion it might go to EXAMINER_TURN, which is still fine since user
-            // intentionally barged in to speak.
+            // Invalidate + actually cancel any in-flight examiner-turn
+            // request: bumping the generation makes handleExaminerResponse
+            // drop the response if it still lands, and abort() cuts the
+            // network call short so it doesn't overlap the candidate's
+            // live answer with TTS/an out-of-order transcript turn.
+            examinerTurnGenerationRef.current++;
+            examinerTurnAbortRef.current?.abort();
             dispatch({ type: "LISTENING_START" });
           } catch {
             // noop
@@ -661,6 +688,97 @@ function SessionRoomInner() {
     if (speechState.recordingMode !== "auto") return;
     // Start immediately (micro ON, examinateur done, à ton tour de parler)
     void startNewTurnRecording({ autoVadCommitMs: 1500 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.kind]);
+
+  // T1 ONLY · Auto-évaluation: dès que kind passe à TASK_COMPLETE pour T1 (drill_* modes,
+  // PAS full_exam), on démarre START_EVAL puis POST /evaluate et redirect rapport.
+  // Guard par autoEvalInFlightRef contre StrictMode double-fire.
+  useEffect(() => {
+    if (state.kind !== "TASK_COMPLETE") return;
+    if (state.currentTask !== 1) return;
+    if (mode === "full_exam") return;
+    if (!archetype) return;
+    if (autoEvalInFlightRef.current) return;
+    if (state.transcript.length === 0) return;
+
+    autoEvalInFlightRef.current = true;
+    let cancelled = false;
+
+    dispatch({ type: "START_EVAL" });
+
+    void (async () => {
+      try {
+        const evalRes = await fetch("/api/eo/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session: { mode, target_note_20: 10 },
+            tasks: [
+              {
+                task: archetype.task,
+                archetype: {
+                  id: archetype.id,
+                  task: archetype.task,
+                  consigne: archetype.consigne,
+                  categorie: archetype.categorie,
+                  question_ouverture: archetype.question_ouverture ?? null,
+                  required_moves: archetype.required_moves ?? null,
+                  examiner_role: archetype.examiner_role ?? null,
+                  scene_facts: archetype.scene_facts ?? null,
+                  complication: archetype.complication ?? null,
+                  arguments_pour: archetype.arguments_pour ?? null,
+                  arguments_contre: archetype.arguments_contre ?? null,
+                  duration_sec: archetype.duration_sec,
+                },
+                turns: state.transcript,
+                prep_notes: notes || null,
+              },
+            ],
+          }),
+        });
+        if (!evalRes.ok) throw new Error(`HTTP ${evalRes.status}`);
+        const evalData = await evalRes.json();
+
+        const sessRes = await fetch("/api/eo/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode,
+            target_note_20: 10,
+            evaluation: evalData.evaluation,
+            tasks_snapshot: [
+              {
+                task: archetype.task,
+                archetype_id: archetype.id,
+                turns: state.transcript,
+              },
+            ],
+          }),
+        });
+
+        if (cancelled) return;
+
+        let sessionId = archetype.id + "-" + Date.now();
+        if (sessRes.ok) {
+          const s = await sessRes.json();
+          sessionId = s.session?.id || sessionId;
+        }
+
+        dispatch({ type: "EVAL_DONE" });
+        router.replace(`/expression-orale/session/${encodeURIComponent(sessionId)}`);
+      } catch (e) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        dispatch({ type: "ERROR", payload: `Évaluation auto T1: ${msg}` });
+        setNetworkError(`⚠ Évaluation automatique échouée: ${msg} · Vous pouvez cliquer le bouton manuel "Évaluer ma performance" ci-dessous pour réessayer.`);
+        autoEvalInFlightRef.current = false;
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.kind]);
 
@@ -1071,6 +1189,38 @@ function SessionRoomInner() {
             }}
           >
             ⚠ {state.error}
+          </div>
+        )}
+
+        {transcribeError && (
+          <div
+            style={{
+              padding: "16px 18px",
+              borderRadius: 12,
+              background: "rgba(190, 47, 70, 0.08)",
+              border: "1px solid rgba(190, 47, 70, 0.25)",
+              color: "#BE2F46",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            🎙 {transcribeError}
+          </div>
+        )}
+
+        {isTranscribing && !transcribeError && (
+          <div
+            style={{
+              padding: "16px 18px",
+              borderRadius: 12,
+              background: "rgba(76, 90, 110, 0.08)",
+              border: "1px solid rgba(76, 90, 110, 0.25)",
+              color: "#4C5A6E",
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            ⏳ Transcription de votre réponse en cours…
           </div>
         )}
 

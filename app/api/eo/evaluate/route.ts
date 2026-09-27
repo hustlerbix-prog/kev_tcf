@@ -23,6 +23,10 @@ import { calcSpeechMetrics } from "@/lib/eo/speechMetrics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// A + B run in parallel (up to ~55s each via appelOpenRouter's own timeout),
+// then an optional tiebreaker C runs sequentially on top of that when A/B
+// disagree — worst case is close to 2x a single call's budget.
+export const maxDuration = 120;
 
 const EVALUATOR_A_PERSONA = "Correcteur standard, tempéré et juste";
 const EVALUATOR_B_PERSONA = "Correcteur sévère, exigeant sur la grammaire et la structure";
